@@ -3,34 +3,53 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QLabel, QLineEdit,
 
 import pandas as pd
 
+import math as m
+import statistics as st
+
 import sys # Только для доступа к аргументам командной строки
 
 class Statistics():
-    def __init__(self, table):
-        self.table = table
-        self.table.columns.values[0] = "Time"      
-        self.totalTime = self.calcTotalTime()
-        self.totalDistance = self.calcDistance()
-        self.totalVelocity = self.calcTotalVelocity()
-        self.rearings = self.calcRearings()
-        print(self.table)
+    def __init__(self, df):
+        df.columns.values[0] = "Time"      
+        self.totalTime = self.calcTotalTime(df)
+        self.totalDistance = self.calcDistance(df)
+        self.totalVelocity = self.calcTotalVelocity(df)
+        self.rearings = self.calcRearings(df)
+      #  print(df.to_string())
 
-    def calcTotalTime(self):
-        timeStart = pd.Timestamp(self.table.iloc[0, 0])
-        timeEnd = pd.Timestamp(self.table.iloc[-1, 0])
+    def calcTotalTime(self, df):
+        timeStart = pd.Timestamp(df.loc[df.index[0], 'Time'])
+        timeEnd = pd.Timestamp(df.loc[df.index[-1], 'Time'])
         totalTimeSec = pd.Interval(timeStart, timeEnd).length.seconds
         totalTimeMicrSec = pd.Interval(timeStart, timeEnd).length.microseconds
         totalTime = f"{totalTimeSec}.{totalTimeMicrSec}"
-        print(totalTime)
+        print(f'Total time: {totalTime}')
         return totalTime
         
-    def calcDistance(self):
+    def calcDistance(self, df):
+        df['X'] = 0
+        df['Y'] = 0
+        df['dist'] = 0
+        totalDistance = 0
+        for i, row in df.iterrows():
+            df.at[i, 'X'] = st.fmean([df.at[i, 'X1'], df.at[i, 'X2']])
+            df.at[i, 'Y'] = st.fmean([df.at[i, 'Y1'], df.at[i, 'Y2']])
+            if i != 0:
+                p = [df.at[i-1, 'X'], df.at[i-1, 'Y']]   # previous point
+                q = [df.at[i, 'X'], df.at[i, 'Y']]          # current point
+              #  print(p, q)
+                dist = m.dist(p, q)
+                df.at[i, 'dist'] = dist
+                totalDistance += dist
+        print(f'Total distance: {totalDistance}')
+      #  print(df.to_string())
+        return totalDistance
+                
+        
+    def calcTotalVelocity(self, df):
         pass
         
-    def calcTotalVelocity(self):
-        pass
-        
-    def calcRearings(self):
+    def calcRearings(self, df):
         pass
         
 
@@ -40,7 +59,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("OpenField processing")
         self.getFileButton = QPushButton("Select file")
         self.showStatButton = QPushButton("Show general statistics")
-        self.table = pd.DataFrame()
+        self.df = pd.DataFrame()
         
         # self.line.textChanged.connect(self.label.setText)
         self.getFileButton.clicked.connect(self.getFile)
@@ -65,8 +84,8 @@ class MainWindow(QMainWindow):
     def getFile(self):
         self.file, _filter = QFileDialog.getOpenFileName(self, 
                              "Open .csv file", r"C:\OpenField\Data1.csv", "CSV files (*.csv)")
-        self.table = pd.read_csv(self.file, delimiter=";")
-        self.stat = Statistics(self.table) 
+        self.df = pd.read_csv(self.file, delimiter=";")
+        self.stat = Statistics(self.df) 
         
     def showStat(self):
         self.totalTime = QLabel(f"Total time: {self.stat.totalTime}")
