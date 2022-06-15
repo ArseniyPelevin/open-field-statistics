@@ -7,13 +7,22 @@ import sys # Только для доступа к аргументам кома
 
 class Statistics():
     def __init__(self, table):
-
-        table.columns.values[0] = "Time"      
+        self.table = table
+        self.table.columns.values[0] = "Time"      
         self.totalTime = self.calcTotalTime()
         self.totalDistance = self.calcDistance()
         self.totalVelocity = self.calcTotalVelocity()
         self.rearings = self.calcRearings()
-        print(table)
+        print(self.table)
+
+    def calcTotalTime(self):
+        timeStart = pd.Timestamp(self.table.iloc[0, 0])
+        timeEnd = pd.Timestamp(self.table.iloc[-1, 0])
+        totalTimeSec = pd.Interval(timeStart, timeEnd).length.seconds
+        totalTimeMicrSec = pd.Interval(timeStart, timeEnd).length.microseconds
+        totalTime = f"{totalTimeSec}.{totalTimeMicrSec}"
+        print(totalTime)
+        return totalTime
         
     def calcDistance(self):
         pass
@@ -22,9 +31,6 @@ class Statistics():
         pass
         
     def calcRearings(self):
-        pass
-        
-    def calcTotalTime(self):
         pass
         
 
@@ -58,7 +64,7 @@ class MainWindow(QMainWindow):
         
     def getFile(self):
         self.file, _filter = QFileDialog.getOpenFileName(self, 
-                             "Open .csv file", r"C:\OpenField", "CSV files (*.csv)")
+                             "Open .csv file", r"C:\OpenField\Data1.csv", "CSV files (*.csv)")
         self.table = pd.read_csv(self.file, delimiter=";")
         self.stat = Statistics(self.table) 
         
