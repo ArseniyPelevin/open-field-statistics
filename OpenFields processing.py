@@ -7,14 +7,13 @@ import sys # Только для доступа к аргументам кома
 
 class Statistics():
     def __init__(self, table):
-        print(table)
-        table.rename(columns={"":"Time"})
+
+        table.columns.values[0] = "Time"      
+        self.totalTime = self.calcTotalTime()
         self.totalDistance = self.calcDistance()
         self.totalVelocity = self.calcTotalVelocity()
         self.rearings = self.calcRearings()
-        self.totalTime = self.calcTotalTime()
-        
-
+        print(table)
         
     def calcDistance(self):
         pass
@@ -33,21 +32,21 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OpenField processing")
-        self.button = QPushButton("Select file")
+        self.getFileButton = QPushButton("Select file")
+        self.showStatButton = QPushButton("Show general statistics")
         self.table = pd.DataFrame()
         
         # self.line.textChanged.connect(self.label.setText)
-        self.button.clicked.connect(self.getFile)
+        self.getFileButton.clicked.connect(self.getFile)
+        self.showStatButton.clicked.connect(self.showStat)
         
-        self.totalDistance = QLabel(f"Total distance: {self.stat.totalDistance}")
-        self.rearings = QLabel()
-        self.totalVelocity = QLabel()
         # self.line = QLineEdit()        
         
         layout = QVBoxLayout()
         # layout.addWidget(self.line)
         # layout.addWidget(self.label)
-        layout.addWidget(self.button)
+        layout.addWidget(self.getFileButton)
+        layout.addWidget(self.showStatButton)
         
         container = QWidget()
         container.setLayout(layout)
@@ -60,9 +59,14 @@ class MainWindow(QMainWindow):
     def getFile(self):
         self.file, _filter = QFileDialog.getOpenFileName(self, 
                              "Open .csv file", r"C:\OpenField", "CSV files (*.csv)")
-        self.table = pd.read_csv(self.file)
+        self.table = pd.read_csv(self.file, delimiter=";")
         self.stat = Statistics(self.table) 
-        print(type(self.table))
+        
+    def showStat(self):
+        self.totalTime = QLabel(f"Total time: {self.stat.totalTime}")
+        self.totalDistance = QLabel(f"Total distance: {self.stat.totalDistance}")
+        self.totalVelocity = QLabel(f"Total velocity: {self.stat.totalVelocity}")
+        self.rearings = QLabel(f"Rearings: {self.stat.rearings}")
         
     # def button_text(self):
     #     self.button.setText("Pushed")
