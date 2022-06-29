@@ -1,7 +1,12 @@
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QLabel, QLineEdit,
-     QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QFileDialog)
-from PyQt6.QtCore import QEvent
-from PyQt6.QtGui import QFontMetrics, QFont
+#from PyQt6.QtWidgets import (QApplication, QMainWindow, QLabel, QLineEdit,
+#     QVBoxLayout, QHBoxLayout, QGridLayout, QWidget, QPushButton, QFileDialog)
+#from PyQt6.QtCore import QEvent
+#from PyQt6.QtGui import QFontMetrics, QFont
+
+from PyQt6.QtWidgets import *
+from PyQt6.QtCore import *
+from PyQt6.QtGui import *
+from superqt import QRangeSlider
 
 import pandas as pd
 
@@ -16,7 +21,7 @@ class Statistics():
         self.totalTime = self.calcTotalTime(df)
         self.totalDistance = self.calcDistance(df)
         self.totalVelocity = self.calcVelocity()
-        self.rearings = self.calcRearings(df)
+        self.totalRearings = self.calcRearings(df)
         
         #test
         #self.timePoint(df, 11)
@@ -110,9 +115,16 @@ class MainWindow(QMainWindow):
         self.selectedTime = QLabel("Selected time:")
         self.selectedDistance = QLabel("Selected distance:")
         self.selectedVelocity = QLabel("Selected velocity:")
-        self.selectedRrearings = QLabel("Selected rearings:")
+        self.selectedRearings = QLabel("Selected rearings:")
+        
         self.startTime = QLineEdit()
+        self.startTime.setDisabled(True)
         self.endTime = QLineEdit()
+        self.endTime.setDisabled(True)
+        self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
+        self.timeRangeSlider.setDisabled(True)
+        self.timeRangeSlider.valueChanged.connect(self.updateTimeRange)
+        
         
         # self.line.textChanged.connect(self.label.setText)
         self.getFileButton.clicked.connect(self.getFile)
@@ -122,13 +134,19 @@ class MainWindow(QMainWindow):
         
         generalLayout = QHBoxLayout()
         controlLayout = QVBoxLayout()
+        timeRangeLayout = QGridLayout()
         dataLayout = QVBoxLayout()
-
+        
+        timeRangeLayout.addWidget(self.startTime, 0, 0, alignment = Qt.AlignLeft)
+        timeRangeLayout.addWidget(self.endTime, 0, 1, alignment = Qt.AlignRight)
+        timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 2)
+        
         controlLayout.addWidget(self.getFileButton)
-        controlLayout.addWidget(self.fileName)
-        controlLayout.addWidget(self.selectTime)
-        # QFileOpenEvent.connect(self.updateStat)
-        # controlLayout.addWidget(self.showStatButton)
+        controlLayout.addWidget(self.fileName, alignment = Qt.AlignTop)
+        controlLayout.addWidget(self.selectTime, alignment = Qt.AlignBottom)
+        
+        controlLayout.addLayout(timeRangeLayout)
+
         
         dataLayout.addWidget(self.totalTime)
         dataLayout.addWidget(self.totalDistance)
@@ -138,11 +156,11 @@ class MainWindow(QMainWindow):
         dataLayout.addWidget(self.selectedTime)
         dataLayout.addWidget(self.selectedDistance)
         dataLayout.addWidget(self.selectedVelocity)
-        dataLayout.addWidget(self.selectedRrearings)
+        dataLayout.addWidget(self.selectedRearings)
         
         generalLayout.addLayout(controlLayout)
         generalLayout.addLayout(dataLayout)
-        
+                
         container = QWidget()
         container.setLayout(generalLayout)
         
@@ -156,13 +174,41 @@ class MainWindow(QMainWindow):
         self.fileName.setText(self.file)
         self.df = pd.read_csv(self.file, delimiter=";")
         self.stat = Statistics(self.df) 
-        self.updateStat()
+        self.totalStat()
+        self.setTimeRange()
         
-    def updateStat(self):
+    def totalStat(self):
         self.totalTime.setText(f"Total time: {self.stat.totalTime} s")
         self.totalDistance.setText(f"Total distance: {self.stat.totalDistance} cm")
         self.totalVelocity.setText(f"Total velocity: {self.stat.totalVelocity} cm/s")
-        self.totalRearings.setText(f"Rearings: {self.stat.rearings}")
+        self.totalRearings.setText(f"Total rearings: {self.stat.totalRearings}")
+        
+    def selectedStat(self, start, end):
+        self.selectedTime.setText(f"Selected time: {self.stat.selectedTime} s")
+        self.selectedDistance.setText(f"Selected distance: {self.stat.selectedDistance} cm")
+        self.selectedVelocity.setText(f"Selected velocity: {self.stat.selectedVelocity} cm/s")
+        self.selectedRearings.setText(f"Selected rearings: {self.stat.rearings}")
+        
+    def setTimeRange(self):
+        self.timeRangeSlider.setRange(0, self.stat.totalTime*10)
+        self.timeRangeSlider.setValue([0, self.stat.totalTime*10])
+        
+        self.startTime.setEnabled(True)
+        self.endTime.setEnabled(True)
+        self.timeRangeSlider.setEnabled(True)
+        
+        self.startTime.setText(str(0))
+        self.endTime.setText(str(self.stat.totalTime))
+        
+    def updateTimeRange(self):
+        start, end = [x/10 for x in self.timeRangeSlider.value()]
+        
+        self.startTime.setText(str(start))
+        self.endTime.setText(str(end))
+
+        self.selectedStat(start, end)
+        
+        
         
     # def button_text(self):
     #     self.button.setText("Pushed")
