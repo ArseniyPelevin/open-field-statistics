@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QLabel, QLineEdit,
      QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QFileDialog)
 from PyQt6.QtCore import QEvent
-from PyQt6.QtGui import QPainter, QFontMetrics, QFont
+from PyQt6.QtGui import QFontMetrics, QFont
 
 import pandas as pd
 
@@ -15,7 +15,7 @@ class Statistics():
         df.columns.values[0] = "Time"      
         self.totalTime = self.calcTotalTime(df)
         self.totalDistance = self.calcDistance(df)
-        self.totalVelocity = self.totalDistance / self.totalTime
+        self.totalVelocity = self.calcVelocity()
         self.rearings = self.calcRearings(df)
         
         #test
@@ -41,7 +41,8 @@ class Statistics():
         totalTimeSec = pd.Interval(self.timeStart, timeEnd).length.seconds
         totalTimeMicrSec = pd.Interval(self.timeStart, timeEnd).length.microseconds
         totalTime = float(f"{totalTimeSec}.{totalTimeMicrSec}")
-        print(f'Total time: {totalTime}')
+        totalTime = round(totalTime, 1)
+        print(f"Total time: {totalTime} s")
         return totalTime
         
     # distance in cell units yet
@@ -49,7 +50,7 @@ class Statistics():
         df['X'] = 0
         df['Y'] = 0
         df['dist'] = 0
-        totalDistance = 0
+        distance = 0
         for i, row in df.iterrows():
             
             # calculate central point of animal
@@ -61,10 +62,19 @@ class Statistics():
             q = [df.at[i, 'X'], df.at[i, 'Y']]       # current point
             dist = m.dist(p, q)
             df.at[i, 'dist'] = dist                  # dist since last point
-            totalDistance += dist
+            distance += dist
+        distance = distance * (40 / 16)
+        # 40 cm - edge of OpenField box, 16 - number of cells
+        distance = round(distance, 1)
                 
-        print(f'Total distance: {totalDistance}')
-        return totalDistance
+        print(f'Total distance: {distance} cm')
+        return distance
+    
+    def calcVelocity(self):
+        velocity = self.totalDistance / self.totalTime
+        velocity = round(velocity, 1)
+        print(f"Total velocity: {velocity} cm/s")
+        return velocity
         
     def calcRearings(self, df):
         wasRearing = False
@@ -89,15 +99,20 @@ class MainWindow(QMainWindow):
        
         self.df = pd.DataFrame()
         
-        self.totalTime = QLabel(f"Total time:")
-        self.totalDistance = QLabel(f"Total distance:")
-        self.totalVelocity = QLabel(f"Total velocity:")
-        self.totalRearings = QLabel(f"Total rearings:")
+        self.fileName = QLabel()
+        self.selectTime = QLabel("Select time interval:")
         
-        self.selectedTime = QLabel(f"Selected time:")
-        self.selectedDistance = QLabel(f"Selected distance:")
-        self.selectedVelocity = QLabel(f"Selected velocity:")
-        self.selectedRrearings = QLabel(f"Selected rearings:")
+        self.totalTime = QLabel("Total time:")
+        self.totalDistance = QLabel("Total distance:")
+        self.totalVelocity = QLabel("Total velocity:")
+        self.totalRearings = QLabel("Total rearings:")
+        
+        self.selectedTime = QLabel("Selected time:")
+        self.selectedDistance = QLabel("Selected distance:")
+        self.selectedVelocity = QLabel("Selected velocity:")
+        self.selectedRrearings = QLabel("Selected rearings:")
+        self.startTime = QLineEdit()
+        self.endTime = QLineEdit()
         
         # self.line.textChanged.connect(self.label.setText)
         self.getFileButton.clicked.connect(self.getFile)
@@ -110,6 +125,8 @@ class MainWindow(QMainWindow):
         dataLayout = QVBoxLayout()
 
         controlLayout.addWidget(self.getFileButton)
+        controlLayout.addWidget(self.fileName)
+        controlLayout.addWidget(self.selectTime)
         # QFileOpenEvent.connect(self.updateStat)
         # controlLayout.addWidget(self.showStatButton)
         
@@ -134,16 +151,17 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
         
     def getFile(self):
-        self.file, _filter = QFileDialog.getOpenFileName(self, 
-                             "Open .csv file", r"C:\OpenField\Data1.csv", "CSV files (*.csv)")
+        self.file, _filter = QFileDialog.getOpenFileName(self, "Open .csv file", 
+                             r"C:\OpenField\Data1.csv", "CSV files (*.csv)")
+        self.fileName.setText(self.file)
         self.df = pd.read_csv(self.file, delimiter=";")
         self.stat = Statistics(self.df) 
         self.updateStat()
         
     def updateStat(self):
-        self.totalTime.setText(f"Total time: {self.stat.totalTime}")
-        self.totalDistance.setText(f"Total distance: {self.stat.totalDistance}")
-        self.totalVelocity.setText(f"Total velocity: {self.stat.totalVelocity}")
+        self.totalTime.setText(f"Total time: {self.stat.totalTime} s")
+        self.totalDistance.setText(f"Total distance: {self.stat.totalDistance} cm")
+        self.totalVelocity.setText(f"Total velocity: {self.stat.totalVelocity} cm/s")
         self.totalRearings.setText(f"Rearings: {self.stat.rearings}")
         
     # def button_text(self):
