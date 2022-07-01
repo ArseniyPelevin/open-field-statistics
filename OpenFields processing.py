@@ -10,6 +10,8 @@ from superqt import QRangeSlider
 
 import pandas as pd
 
+from datetime import datetime, timedelta
+
 import math as m
 import statistics as st
 
@@ -19,9 +21,9 @@ class Statistics():
     def __init__(self, df):
         df.columns.values[0] = "Time"      
         self.totalTime = self.calcTotalTime(df)
-        self.totalDistance = self.calcDistance(df)
-        self.totalVelocity = self.calcVelocity()
-        self.totalRearings = self.calcRearings(df)
+        self.totalDistance = self.calcTotalDistance(df)
+        self.totalVelocity = self.calcVelocity(0, self.totalTime, self.totalDistance)
+        self.totalRearings = self.calcRearings(df, 0, df.index[-1])
         
         #test
         #self.timePoint(df, 11)
@@ -30,32 +32,37 @@ class Statistics():
        # print(df)
        
     def timePoint(self, df, time):
-        tp = self.timeStart + pd.Timestamp(time, unit='s')
+        tp = self.timeStart + timedelta(seconds=time)
         
         # find closest existing time point
         for i, row in df.iterrows():
-            if df.at[i, 'Time'] > tp:
-                tp = df.at[i-1, 'Time']
+            curTime = datetime.strptime(df.at[i, 'Time'][:-1], '%H:%M:%S.%f')
+            if curTime > tp:
+                tp = i - 1
+                break
+            elif i == df.index[-1]:
+                tp = i
+                # Find row index prior to desired time
                 
-        print(f'timepoint = {tp}')
+        # print(f'Timepoint of {time} = {tp}')
         return tp
 
     def calcTotalTime(self, df):
-        self.timeStart = pd.Timestamp(df.at[0, 'Time'])
-        timeEnd = pd.Timestamp(df.at[df.index[-1], 'Time'])
-        totalTimeSec = pd.Interval(self.timeStart, timeEnd).length.seconds
-        totalTimeMicrSec = pd.Interval(self.timeStart, timeEnd).length.microseconds
-        totalTime = float(f"{totalTimeSec}.{totalTimeMicrSec}")
-        totalTime = round(totalTime, 1)
+        self.timeStart = df.at[0, 'Time'][:-1]      
+        # [:-1] because original time has 7 decimals instead of 6
+        self.timeStart = datetime.strptime(self.timeStart, '%H:%M:%S.%f')
+        timeEnd = df.at[df.index[-1], 'Time'][:-1]
+        timeEnd = datetime.strptime(timeEnd, '%H:%M:%S.%f')
+        totalTime = round(timedelta.total_seconds(timeEnd-self.timeStart), 1)
         print(f"Total time: {totalTime} s")
         return totalTime
         
     # distance in cell units yet
-    def calcDistance(self, df):
+    def calcTotalDistance(self, df):
         df['X'] = 0
         df['Y'] = 0
         df['dist'] = 0
-        distance = 0
+        totalDistance = 0
         for i, row in df.iterrows():
             
             # calculate central point of animal
@@ -65,26 +72,37 @@ class Statistics():
             if i == 0: continue
             p = [df.at[i-1, 'X'], df.at[i-1, 'Y']]   # previous point
             q = [df.at[i, 'X'], df.at[i, 'Y']]       # current point
-            dist = m.dist(p, q)
+            dist = m.dist(p, q) * (40 / 16)
+            # 40 cm - edge of OpenField box, 16 - number of cells
             df.at[i, 'dist'] = dist                  # dist since last point
-            distance += dist
-        distance = distance * (40 / 16)
-        # 40 cm - edge of OpenField box, 16 - number of cells
-        distance = round(distance, 1)
+            totalDistance += dist
+        totalDistance = round(totalDistance, 1)
                 
-        print(f'Total distance: {distance} cm')
+        print(f'Total distance: {totalDistance} cm')
+        return totalDistance
+    
+    def calcDistance(self, df, start, end):
+        row1 = self.timePoint(df, start)
+        row2 = self.timePoint(df, end)
+        distance = 0
+        for i, row in df.iloc[row1:row2+1, :].iterrows():
+            distance += row['dist']
+        distance = round(distance)
+        print(f"Selected distance: {distance} cm")
         return distance
     
-    def calcVelocity(self):
-        velocity = self.totalDistance / self.totalTime
+    def calcVelocity(self, start, end, dist):
+        velocity = dist / (end - start)
         velocity = round(velocity, 1)
         print(f"Total velocity: {velocity} cm/s")
         return velocity
         
-    def calcRearings(self, df):
+    def calcRearings(self, df, start, end):
+        row1 = self.timePoint(df, start)
+        row2 = self.timePoint(df, end)
         wasRearing = False
         rearings = 0
-        for i, row in df.iterrows():
+        for i, row in df.iloc[row1:row2+1, :].iterrows():
             if row['Z'] and not wasRearing:
                 rearings += 1
                 wasRearing = True
@@ -102,7 +120,7 @@ class MainWindow(QMainWindow):
         self.getFileButton = QPushButton("Select file")
         self.showStatButton = QPushButton("Show general statistics")
        
-        self.df = pd.DataFrame()
+        #self.df = pd.DataFrame()
         
         self.fileName = QLabel()
         self.selectTime = QLabel("Select time interval:")
@@ -123,14 +141,11 @@ class MainWindow(QMainWindow):
         self.endTime.setDisabled(True)
         self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
         self.timeRangeSlider.setDisabled(True)
-        self.timeRangeSlider.valueChanged.connect(self.updateTimeRange)
         
-        
-        # self.line.textChanged.connect(self.label.setText)
         self.getFileButton.clicked.connect(self.getFile)
-       # self.showStatButton.clicked.connect(self.showStat)
-        
-        # self.line = QLineEdit()        
+        self.startTime.editingFinished.connect(self.textUpdateTimeRange)
+        self.endTime.editingFinished.connect(self.textUpdateTimeRange)
+        self.timeRangeSlider.sliderReleased.connect(self.sliderUpdateTimeRange)  
         
         generalLayout = QHBoxLayout()
         controlLayout = QVBoxLayout()
@@ -146,7 +161,6 @@ class MainWindow(QMainWindow):
         controlLayout.addWidget(self.selectTime, alignment = Qt.AlignBottom)
         
         controlLayout.addLayout(timeRangeLayout)
-
         
         dataLayout.addWidget(self.totalTime)
         dataLayout.addWidget(self.totalDistance)
@@ -184,12 +198,19 @@ class MainWindow(QMainWindow):
         self.totalRearings.setText(f"Total rearings: {self.stat.totalRearings}")
         
     def selectedStat(self, start, end):
-        self.selectedTime.setText(f"Selected time: {self.stat.selectedTime} s")
-        self.selectedDistance.setText(f"Selected distance: {self.stat.selectedDistance} cm")
-        self.selectedVelocity.setText(f"Selected velocity: {self.stat.selectedVelocity} cm/s")
-        self.selectedRearings.setText(f"Selected rearings: {self.stat.rearings}")
+        self.selectedTime.setText(f"Selected time: {start}-{end} s")
+        
+        selectedDistance = self.stat.calcDistance(self.df, start, end)
+        self.selectedDistance.setText(f"Selected distance: {selectedDistance} cm")
+        
+        selectedVelocity = self.stat.calcVelocity(start, end, selectedDistance)
+        self.selectedVelocity.setText(f"Selected velocity: {selectedVelocity} cm/s")
+        
+        selectedRearings = self.stat.calcRearings(self.df, start, end)
+        self.selectedRearings.setText(f"Selected rearings: {selectedRearings}")
         
     def setTimeRange(self):
+        # slider is sensitive to 0.1 sec
         self.timeRangeSlider.setRange(0, self.stat.totalTime*10)
         self.timeRangeSlider.setValue([0, self.stat.totalTime*10])
         
@@ -200,13 +221,32 @@ class MainWindow(QMainWindow):
         self.startTime.setText(str(0))
         self.endTime.setText(str(self.stat.totalTime))
         
-    def updateTimeRange(self):
+    def sliderUpdateTimeRange(self):
         start, end = [x/10 for x in self.timeRangeSlider.value()]
         
         self.startTime.setText(str(start))
         self.endTime.setText(str(end))
 
         self.selectedStat(start, end)
+        
+    def textUpdateTimeRange(self):
+        start = float(self.startTime.text())
+        end = float(self.endTime.text())
+        if start >= end: 
+            return
+        
+        self.timeRangeSlider.setValue([start*10, end*10])
+        
+        self.selectedStat(start, end)
+        
+    def released(self):
+        print('released')
+    def pressed(self):
+        print('pressed')
+    def changed(self):
+        print('changed')
+    def moved(self):
+        print('moved')
         
         
         
