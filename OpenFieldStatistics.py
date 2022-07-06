@@ -69,9 +69,11 @@ class OFStatistics():
         print(f'Total distance: {totalDistance} cm')
         return totalDistance
     
-    def calcDistance(self, df, start, end):
-        row1 = self.timePoint(df, start)
-        row2 = self.timePoint(df, end)
+    def calcDistance(self, df, iStart, iEnd):
+        # row1 = self.timePoint(df, start)
+        # row2 = self.timePoint(df, end)
+        row1 = iStart
+        row2 = iEnd
         distance = 0
         for i, row in df.iloc[row1:row2+1, :].iterrows():
             distance += row['dist']
@@ -85,9 +87,11 @@ class OFStatistics():
         print(f"Total velocity: {velocity} cm/s")
         return velocity
         
-    def calcRearings(self, df, start, end):
-        row1 = self.timePoint(df, start)
-        row2 = self.timePoint(df, end)
+    def calcRearings(self, df, iStart, iEnd):
+        # row1 = self.timePoint(df, start)
+        # row2 = self.timePoint(df, end)
+        row1 = iStart
+        row2 = iEnd
         wasRearing = False
         rearings = 0
         for i, row in df.iloc[row1:row2+1, :].iterrows():
