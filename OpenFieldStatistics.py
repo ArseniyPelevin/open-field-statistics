@@ -77,14 +77,14 @@ class OFStatistics():
         distance = 0
         for i, row in df.iloc[row1:row2+1, :].iterrows():
             distance += row['dist']
-        distance = round(distance)
+        distance = round(distance, 1)
         print(f"Selected distance: {distance} cm")
         return distance
     
     def calcVelocity(self, start, end, dist):
         velocity = dist / (end - start)
         velocity = round(velocity, 1)
-        print(f"Total velocity: {velocity} cm/s")
+        print(f"Velocity: {velocity} cm/s")
         return velocity
         
     def calcRearings(self, df, iStart, iEnd):

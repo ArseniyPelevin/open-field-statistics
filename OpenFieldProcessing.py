@@ -22,7 +22,10 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OpenField processing")
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 800, 500)
+        
+        self.numLasers = 16
+        self.mapSide = 320 # px
         
         self.getFileButton = QPushButton("Select file")
         self.showStatButton = QPushButton("Show general statistics")
@@ -50,6 +53,9 @@ class MainWindow(QMainWindow):
         self.timeRangeSlider.setDisabled(True)
         
         self.map = QLabel()
+        # self.squareMapButtons()
+        # self.verticalMapButtons()
+        self.horizontalMapButtons()
                 
         self.getFileButton.clicked.connect(self.getFile)
         # Check if input is correct
@@ -99,10 +105,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
         
     def getFile(self):
-        self.file, _filter = QFileDialog.getOpenFileName(self, "Open .csv file", 
-                             r"C:\OpenField\Data1.csv", "CSV files (*.csv)")
-        self.fileName.setText(self.file)
-        self.df = pd.read_csv(self.file, delimiter=";")
+        # self.file, _filter = QFileDialog.getOpenFileName(self, "Open .csv file", 
+        #                      r"C:\OpenField\Data1.csv", "CSV files (*.csv)")
+        file = r"C:\OpenField\Data1.csv"
+        self.fileName.setText(file)
+        self.df = pd.read_csv(file, delimiter=";")
         self.stat = OFStatistics(self.df) 
         self.totalStat()
         self.setTimeRange()
@@ -185,18 +192,18 @@ class MainWindow(QMainWindow):
         self.drawMap(iStart, iEnd)
                 
     def drawMap(self, iStart, iEnd):
-        numLasers = 16
-        mapSide = 320
-        canvas = QPixmap(mapSide + 1, mapSide + 1)
+        
+        
+        canvas = QPixmap(self.mapSide + 1, self.mapSide + 1)
         canvas.fill()
         painter = QPainter(canvas)
-        cell = int(mapSide / numLasers)
+        cell = int(self.mapSide / self.numLasers)
         
         # Draw grid
-        for i in range(0, numLasers + 1):
+        for i in range(0, self.numLasers + 1):
             step = cell * i
-            painter.drawLine(0, step, mapSide, step)
-            painter.drawLine(step, 0, step, mapSide)
+            painter.drawLine(0, step, self.mapSide, step)
+            painter.drawLine(step, 0, step, self.mapSide)
             
         # Draw path
         painter.setPen(QPen(Qt.red, 2))
@@ -204,24 +211,65 @@ class MainWindow(QMainWindow):
         for i, row in self.df.iloc[iStart:iEnd, :].iterrows():
             if row['X'] != 0 and row['Y'] != 0:
                 if not lastX:
-                    lastX = row['X'] * cell - cell / 2
-                    lastY = row['Y'] * cell - cell / 2
+                    lastX = int(row['X'] * cell - cell / 2)
+                    lastY = int(row['Y'] * cell - cell / 2)
                     continue
-                x = row['X'] * cell - cell / 2
-                y = row['Y'] * cell - cell / 2
-                #print(f'lastx {lastX}, lastY {lastY}, x {x}, y {y}')
+                x = int(row['X'] * cell - cell / 2)
+                y = int(row['Y'] * cell - cell / 2)
                 painter.drawLine(lastX, lastY, x, y)
                 lastX = x
                 lastY = y
            
         painter.end()
-        self.map.setPixmap(canvas)
+        self.map.setPixmap(canvas)      
         
+    def squareMapButtons(self):
+        self.mapLayout = QGridLayout(self.map)
+        self.mapLayout.setSpacing(0)
+        self.mapLayout.setContentsMargins(1, 1, 1, 1)
+        cell = int(self.mapSide / self.numLasers) # px
+        mapButtons = []
+        for i in range(self.numLasers):
+            mapButtons.append([])
+            for j in range(self.numLasers):
+                mapButtons[i].append(QPushButton('', self.map))
+                mapButtons[i][j].setFixedSize(cell, cell)
+                mapButtons[i][j].setCheckable(True)
+                self.mapLayout.addWidget(mapButtons[i][j], i, j)
+        
+        with open('ButtonStyleSheet.css') as buttonStyleSheet:
+            self.map.setStyleSheet(buttonStyleSheet.read())
 
+    def verticalMapButtons(self):
+        self.mapLayout = QHBoxLayout(self.map)
+        self.mapLayout.setSpacing(0)
+        self.mapLayout.setContentsMargins(1, 1, 1, 1)
+        cell = int(self.mapSide / self.numLasers) # px
+        mapButtons = []
+        for i in range(self.numLasers):
+                mapButtons.append(QPushButton('', self.map))
+                mapButtons[i].setFixedSize(cell, self.mapSide)
+                mapButtons[i].setCheckable(True)
+                self.mapLayout.addWidget(mapButtons[i])
         
+        with open('ButtonStyleSheet.css') as buttonStyleSheet:
+            self.map.setStyleSheet(buttonStyleSheet.read())
             
-
-
+    def horizontalMapButtons(self):
+        self.mapLayout = QVBoxLayout(self.map)
+        self.mapLayout.setSpacing(0)
+        self.mapLayout.setContentsMargins(1, 1, 1, 1)
+        cell = int(self.mapSide / self.numLasers) # px
+        mapButtons = []
+        for i in range(self.numLasers):
+                mapButtons.append(QPushButton('', self.map))
+                mapButtons[i].setFixedSize(self.mapSide, cell)
+                mapButtons[i].setCheckable(True)
+                self.mapLayout.addWidget(mapButtons[i])
+        
+        with open('ButtonStyleSheet.css') as buttonStyleSheet:
+            self.map.setStyleSheet(buttonStyleSheet.read())
+            
 app = QApplication(sys.argv)
 window = MainWindow()
 window.show()
