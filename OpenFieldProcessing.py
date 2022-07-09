@@ -5,7 +5,6 @@
 #from PyQt6.QtCore import QEvent
 #from PyQt6.QtGui import QFontMetrics, QFont
 
-
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 from PyQt6.QtGui import *
@@ -17,9 +16,6 @@ from OpenFieldStatistics import OFStatistics
 
 import os
 import re
-
-import ctypes
-import sip
      
 
 class MainWindow(QMainWindow):
@@ -30,8 +26,6 @@ class MainWindow(QMainWindow):
         
         self.numLasers = 16
         self.mapSide = 320 # px
-        
-        print(os.sys.version)
         
         generalLayout = QHBoxLayout()
         controlLayout = QGridLayout()
@@ -68,17 +62,13 @@ class MainWindow(QMainWindow):
         self.drawMap()
         self.areaButtons()
         
-        # self.checkedAreaBtn = 'Cell'
-        # self.cellMapButtons()
-        self.areaBtn['Cell'].toggled.connect(self.cellMapButton)
-        self.areaBtn['Vertical_halves'].toggled.connect(self.vHalfMapArea)
-        self.areaBtn['Horizontal_halves'].toggled.connect(self.hHalfMapArea)
-        self.areaBtn['Wall'].toggled.connect(self.wallMapArea)        
+        self.areaBtn['Cell'].toggled.connect(self.cellMapButtons)
+        self.areaBtn['Vertical_halves'].toggled.connect(self.vHalfArea)
+        self.areaBtn['Horizontal_halves'].toggled.connect(self.hHalfArea)
+        self.areaBtn['Wall'].toggled.connect(self.wallArea)        
         self.areaBtn['Column'].toggled.connect(self.columnMapButtons)
-        self.areaBtn['Row'].toggled.connect(self.verticalMapButtons)
-        self.areaBtn['Square'].toggled.connect(self.horizontalMapButtons)
-
-
+        self.areaBtn['Row'].toggled.connect(self.rowMapButtons)
+        self.areaBtn['Square'].toggled.connect(self.squareMapButtons)
                 
         self.getFileButton.clicked.connect(self.getFile)
         # Check if input is correct
@@ -117,8 +107,6 @@ class MainWindow(QMainWindow):
                 
         container = QWidget()
         container.setLayout(generalLayout)
-        
-        # self.button.released.connect(self.button_was_toggled)
         
         self.setCentralWidget(container)
         
@@ -245,142 +233,89 @@ class MainWindow(QMainWindow):
         painter.end()
         self.map.setPixmap(canvas)   
         
-    def newAreaBtn(self, name, times):
-        print('a')
+    def newAreaBtn(self, newBtn):
+        for name in self.areaBtnNames:
+            if name != newBtn:
+                # if button is checked - disable others
+                # if unchecked - enable others
+                isOccupied = self.areaBtn[newBtn].isChecked()
+                self.areaBtn[name].setEnabled(not isOccupied)
+        
+        # Delete old buttons
         if hasattr(self, 'mapLayout'):
-            print(self.mapLayout)
-       # self.areaBtn[name].setChecked(True)
-        #self.areaBtn[self.checkedAreaBtn].setChecked(False)
-        self.checkedAreaBtn = name
-        if hasattr(self, 'mapLayout'):
-            print('b')
-            if hasattr(self, 'mapLayout'):
-                print(self.mapLayout)
             for i in reversed(range(self.mapLayout.count())):
-                item = self.mapLayout.itemAt(i).widget()
-                #item.setParent(None)         # We want all previous buttons deleted
+                item = self.mapLayout.itemAt(i).widget()      
                 item.deleteLater()
-                # sip.delete(item)
-             
-
-          #  print(self.mapLayout, self.mapLayout.count())
-        # if hasattr(self, 'mapButtons'):
-        #     print('was here!!')
-        #     for item in self.mapButtons:
-        #         del item
-            # self.mapLayout.deleteLater()
-            # self.map.itemAt(0).removeItem(self.mapLayout)
-            #sip.delete(self.mapLayout)
-            # sip.delete(self.mapLayout)
-
+            # and old map buttons' layout
             self.mapLayout.deleteLater()
-            # QCoreApplication.processEvents()
-            
-            
-           # print(self.mapLayout, self.mapLayout.count())
-        # self.mapButtons = []
-        # cell = int(self.mapSide / self.numLasers) # px
+        self.mapButtons = []
+
+        # Set Style Sheet for all map buttons
         with open('ButtonStyleSheet.css') as buttonStyleSheet:
             self.map.setStyleSheet(buttonStyleSheet.read())
-        # return cell
-        
-        # if times == 0:
-        #     if name == 'Cell': self.cellMapButtons(times)
-        #     if name == 'Column': self.verticalMapButtons(times)
-        #     if name == 'Row': self.horizontalMapButtons(times)
             
-    def cellMapButtons(self, times):
-        # print('CELL 1')
-        # if hasattr(self, 'mapLayout'):
-        #     print(self.mapLayout)
-            
-        # if times == 1: self.newAreaBtn('Cell', times)   
+    def cellMapButtons(self):        
+        self.newAreaBtn('Cell')
         
-        # print('CELL 2')
-        # if hasattr(self, 'mapLayout'):
-        #     print(self.mapLayout)
-           
         cell = int(self.mapSide / self.numLasers) # px
-        mapCButtons = []
         
         self.mapLayout = QGridLayout(self.map)
         self.mapLayout.setSpacing(0)
         self.mapLayout.setContentsMargins(0, 0, 0, 0)
         
         for i in range(self.numLasers):
-            mapCButtons.append([])
+            self.mapButtons.append([])
             for j in range(self.numLasers):
-                mapCButtons[i].append(QPushButton('', self.map))
-                mapCButtons[i][j].setFixedSize(cell, cell)
-                mapCButtons[i][j].setCheckable(True)
-                self.mapLayout.addWidget(mapCButtons[i][j], i, j)
+                self.mapButtons[i].append(QPushButton('', self.map))
+                self.mapButtons[i][j].setFixedSize(cell, cell)
+                self.mapButtons[i][j].setCheckable(True)
+                self.mapLayout.addWidget(self.mapButtons[i][j], i, j)
+                
+    def vHalfArea(self):
+        self.newAreaBtn('Vertical_halves') 
+        self.mapLayout = QHBoxLayout()
+    
+    def hHalfArea(self):
+        self.newAreaBtn('Horizontal_halves')
+        self.mapLayout = QVBoxLayout()
+    
+    def wallArea(self):
+        self.newAreaBtn('Wall')
+        self.mapLayout = QGridLayout()
 
-        
-
-            #self.cellMapButtons()
-        
-        # with open('ButtonStyleSheet.css') as buttonStyleSheet:
-        #     self.map.setStyleSheet(buttonStyleSheet.read())
-
-    def verticalMapButtons(self, times):
-        # print('COLUMN 1')
-        # if hasattr(self, 'mapLayout'):
-        #     print(self.mapLayout)
-            
-        # cell = self.newAreaBtn('Column')  
-        
-        # print('COLUMN 2')
-        # if hasattr(self, 'mapLayout'):
-        #     print(self.mapLayout)
+    def columnMapButtons(self):      
+        self.newAreaBtn('Column')
         
         self.mapLayout = QHBoxLayout(self.map)
         self.mapLayout.setSpacing(0)
         self.mapLayout.setContentsMargins(1, 1, 1, 1)
         
         cell = int(self.mapSide / self.numLasers) # px
-        mapVButtons = []
         
         for i in range(self.numLasers):
-            mapVButtons.append(QPushButton('', self.map))
-            mapVButtons[i].setFixedSize(cell, self.mapSide)
-            mapVButtons[i].setCheckable(True)
-            self.mapLayout.addWidget(mapVButtons[i])
+            self.mapButtons.append(QPushButton('', self.map))
+            self.mapButtons[i].setFixedSize(cell, self.mapSide)
+            self.mapButtons[i].setCheckable(True)
+            self.mapLayout.addWidget(self.mapButtons[i])
             
-        print('Column', self.mapLayout, self.mapLayout.count())
-        
-        # if self.timesNewButton == 0:
-        #     self.timesNewButton = 1
-        #     self.newAreaBtn('Column')
-        #     self.verticalMapButtons()
-                
-        # with open('ButtonStyleSheet.css') as buttonStyleSheet:
-        #     self.map.setStyleSheet(buttonStyleSheet.read())
-        
-        # times += 1
-        # if times < 2:
-        #     self.newAreaBtn('Column', times)
-            #self.cellMapButtons()
-            
-    def horizontalMapButtons(self):      
-        # cell = self.newAreaBtn('Row')
+    def rowMapButtons(self):      
+        self.newAreaBtn('Row')
         
         self.mapLayout = QVBoxLayout(self.map)
         self.mapLayout.setSpacing(0)
         self.mapLayout.setContentsMargins(1, 1, 1, 1)
         
         cell = int(self.mapSide / self.numLasers) # px
-        mapHButtons = []
         
         for i in range(self.numLasers):
-            mapHButtons.append(QPushButton('', self.map))
-            mapHButtons[i].setFixedSize(self.mapSide, cell)
-            mapHButtons[i].setCheckable(True)
-            self.mapLayout.addWidget(mapHButtons[i])
-            
-        print('Row', self.mapLayout, self.mapLayout.count())
+            self.mapButtons.append(QPushButton('', self.map))
+            self.mapButtons[i].setFixedSize(self.mapSide, cell)
+            self.mapButtons[i].setCheckable(True)
+            self.mapLayout.addWidget(self.mapButtons[i])       
         
-        # with open('ButtonStyleSheet.css') as buttonStyleSheet:
-        #     self.map.setStyleSheet(buttonStyleSheet.read())
+    def squareMapButtons(self):
+        self.newAreaBtn('Square')
+        self.mapLayout = QGridLayout()
             
     def areaButtons(self):
         self.areaBtnNames = ['Cell', 'Vertical_halves', 'Horizontal_halves',
@@ -393,27 +328,14 @@ class MainWindow(QMainWindow):
             
             pixmap = QPixmap(os.path.join('Area_Buttons_pixmaps', 
                                   self.areaBtnNames[i] + '.png'))
-            # palette = QPalette()
-            # palette.setBrush(self.areaBtn[name].backgroundRole(), QBrush(pixmap))
 
-            # self.areaBtn[name].setPalette(palette)
-            # self.areaBtn[name].setStyleSheet(f'''
-            #         background-image: 
-            #     url({os.path.join('Area_Buttons_pixmaps', self.areaBtnNames[i] + '.png')});
-                   
-            #         ''')
-            # self.areaBtn[name].setIcon(QIcon(os.path.join('Area_Buttons_pixmaps', 
-            #                                          self.areaBtnNames[i] + '.png')))
             self.areaBtn[name].setIcon(QIcon(pixmap))
-          ##  self.areaBtn[name].setFlat(True)
-           # self.areaBtn[name].setAutoFillBackground(True)
-        #    self.areaBtn[name].setAttribute(Qt.WA_TranslucentBackground)
             self.areaBtn[name].setIconSize(QSize(30, 30))
-            self.areaBtn[name].setFixedSize(30, 30)
+            self.areaBtn[name].setFixedSize(32, 32)
             self.areaButtonLayout.addWidget(self.areaBtn[name])
             self.areaBtn[name].setCheckable(True)
-            # print(name)
-        self.areaButtonLayout.setSpacing(int((self.mapSide - (30 * numAreaBtn)) / \
+
+        self.areaButtonLayout.setSpacing(int((self.mapSide - (32 * numAreaBtn)) / \
                                          (numAreaBtn - 1)))
         self.areaButtonLayout.setContentsMargins(0, 0, 30, 0)
             
