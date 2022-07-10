@@ -273,22 +273,58 @@ class MainWindow(QMainWindow):
                 
     def vHalfArea(self):
         self.newAreaBtn('Vertical_halves') 
-        self.mapLayout = QHBoxLayout()
+        
+        self.mapLayout = QHBoxLayout(self.map)
+        self.mapLayout.setSpacing(0)
+        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        
+        halves = [QPushButton(), QPushButton()]
+        for half in halves:
+            half.setFixedSize(int(self.mapSide / 2), self.mapSide)
+            self.mapLayout.addWidget(half)
+        halves[0].setStyleSheet("background-color: rgba(255, 0, 0, 0.3)")
+        halves[1].setStyleSheet("background-color: rgba(0, 255, 0, 0.3)")
+        
     
     def hHalfArea(self):
         self.newAreaBtn('Horizontal_halves')
-        self.mapLayout = QVBoxLayout()
+        
+        self.mapLayout = QVBoxLayout(self.map)
+        self.mapLayout.setSpacing(0)
+        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        
+        halves = [QPushButton(), QPushButton()]
+        for half in halves:
+            half.setFixedSize(self.mapSide, int(self.mapSide / 2))
+            self.mapLayout.addWidget(half)
+        halves[0].setStyleSheet("background-color: rgba(255, 0, 0, 0.3)")
+        halves[1].setStyleSheet("background-color: rgba(0, 255, 0, 0.3)")
     
     def wallArea(self):
         self.newAreaBtn('Wall')
-        self.mapLayout = QGridLayout()
+        
+        self.mapLayout = QGridLayout(self.map)
+        self.mapLayout.setSpacing(0)
+        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        
+        pixmap = QPixmap(os.path.join('Area_pixmaps', 'wall.png'))
+        outer = QPushButton()
+        outer.setFixedSize(self.mapSide, self.mapSide)
+        outer.setMask(pixmap.scaled(outer.size(), Qt.IgnoreAspectRatio).mask())
+        outer.setStyleSheet("background-color: rgba(255, 0, 0, 0.3)")
+        self.mapLayout.addWidget(outer, 0, 0)
+        
+        inner = outer = QPushButton()
+        inner.setFixedSize(int(self.mapSide / 2), int(self.mapSide / 2))
+        inner.setStyleSheet("background-color: rgba(0, 255, 0, 0.3)")
+        self.mapLayout.addWidget(inner, 0, 0, alignment = Qt.AlignCenter)
 
     def columnMapButtons(self):      
         self.newAreaBtn('Column')
         
         self.mapLayout = QHBoxLayout(self.map)
         self.mapLayout.setSpacing(0)
-        self.mapLayout.setContentsMargins(1, 1, 1, 1)
+        self.mapLayout.setContentsMargins(0, 0, 0, 0)
         
         cell = int(self.mapSide / self.numLasers) # px
         
@@ -303,7 +339,7 @@ class MainWindow(QMainWindow):
         
         self.mapLayout = QVBoxLayout(self.map)
         self.mapLayout.setSpacing(0)
-        self.mapLayout.setContentsMargins(1, 1, 1, 1)
+        self.mapLayout.setContentsMargins(0, 0, 0, 0)
         
         cell = int(self.mapSide / self.numLasers) # px
         
@@ -315,7 +351,19 @@ class MainWindow(QMainWindow):
         
     def squareMapButtons(self):
         self.newAreaBtn('Square')
-        self.mapLayout = QGridLayout()
+        
+        self.mapLayout = QGridLayout(self.map)
+        self.mapLayout.setSpacing(0)
+        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        
+        for i in range(8):
+            self.mapButtons.append(QPushButton('', self.map))
+            self.mapButtons[i].setFixedSize(self.mapSide, self.mapSide)
+            self.mapButtons[i].setCheckable(True)
+            pixmap = QPixmap(os.path.join('Area_pixmaps', f'{i+1}.png')) 
+            self.mapButtons[i].setMask(pixmap.scaled(self.mapButtons[i].size(), 
+                                                    Qt.IgnoreAspectRatio).mask())
+            self.mapLayout.addWidget(self.mapButtons[i], 0, 0) 
             
     def areaButtons(self):
         self.areaBtnNames = ['Cell', 'Vertical_halves', 'Horizontal_halves',
@@ -331,6 +379,7 @@ class MainWindow(QMainWindow):
 
             self.areaBtn[name].setIcon(QIcon(pixmap))
             self.areaBtn[name].setIconSize(QSize(30, 30))
+            # Button is 2px larger than icon, otherwise some icon's pxls are outside
             self.areaBtn[name].setFixedSize(32, 32)
             self.areaButtonLayout.addWidget(self.areaBtn[name])
             self.areaBtn[name].setCheckable(True)
