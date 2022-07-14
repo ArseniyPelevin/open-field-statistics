@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OpenField processing")
-        self.setGeometry(100, 100, 800, 500)
+        self.setGeometry(100, 100, 100, 100)
         
         self.numLasers = 16
         self.mapSide = 320 # px
@@ -33,31 +33,73 @@ class MainWindow(QMainWindow):
         dataLayout = QVBoxLayout()
         self.areaButtonLayout = QVBoxLayout()
         
-        self.getFileButton = QPushButton("Select file")
-        self.showStatButton = QPushButton("Show general statistics")
-       
-        #self.df = pd.DataFrame()
-        
+        getFileButton = QPushButton("Select file")
+        getFileButton.setFixedWidth(80)
         self.fileName = QLabel()
-        self.selectTime = QLabel("Select time interval:")
         
-        self.totalTime = QLabel("Total time:")
-        self.totalDistance = QLabel("Total distance:")
-        self.totalVelocity = QLabel("Total velocity:")
-        self.totalRearings = QLabel("Total rearings:")
+        periodLayout = QHBoxLayout()
+        timePeriod = QLabel("Time period every ")
+        self.period = QLineEdit(alignment = Qt.AlignRight)
+        self.period.setFixedWidth(60)
+        mins = QLabel(" min")
+        periodLayout.addWidget(timePeriod, alignment = Qt.AlignRight)
+        periodLayout.addWidget(self.period, alignment = Qt.AlignRight)
+        periodLayout.addWidget(mins, alignment = Qt.AlignRight)
         
-        self.selectedTime = QLabel("Selected time:")
-        self.selectedDistance = QLabel("Selected distance:")
-        self.selectedVelocity = QLabel("Selected velocity:")
-        self.selectedRearings = QLabel("Selected rearings:")
+        self.table = QTableWidget(20, 3)
         
-        self.startTime = QLineEdit()
+        # Forbid user touch anything in the table
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setFocusPolicy(Qt.NoFocus)
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        
+        self.table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        header = QTableWidgetItem()
+        header.setBackground(QColor(200, 200, 200, 100))
+        self.table.setVerticalHeaderItem(3, header)
+        self.table.setItemDelegate(Delegate(self.table))
+
+        self.table.setVerticalHeaderLabels(['Total time, s', 'Total distance, cm', 
+                                            'Total velocity, cm/s', 'Total rearings',
+                                            'Selected time, s', 'Selected distance, cm', 
+                                            'Selected velocity, cm/s', 'Selected rearings'])
+        self.table.setHorizontalHeaderLabels(['Whole field'])
+        
+        self.table.show()
+        tableWidth = self.tableWidth()
+        self.table.setFixedWidth(tableWidth)
+        self.adjustSize()
+        
+        self.saveButton = QPushButton('Save data')
+        
+        # self.table.setHorizontalHeaderItem(1, QTableWidgetItem('new'))
+        # self.table.setHorizontalHeader(header)      
+        
+        # self.totalTime = QLabel("Total time:")
+        # self.totalDistance = QLabel("Total distance:") 
+        # self.totalVelocity = QLabel("Total velocity:")
+        # self.totalRearings = QLabel("Total rearings:")
+        
+        # self.selectedTime = QLabel("Selected time:")
+        # self.selectedDistance = QLabel("Selected distance:")
+        # self.selectedVelocity = QLabel("Selected velocity:")
+        # self.selectedRearings = QLabel("Selected rearings:")
+        
+        self.startTime = QLineEdit(alignment = Qt.AlignLeft)
+        self.startTime.setFixedWidth(60)
         self.startTime.setDisabled(True)
-        self.endTime = QLineEdit()
+        self.endTime = QLineEdit(alignment = Qt.AlignRight)
+        self.endTime.setFixedWidth(60)
         self.endTime.setDisabled(True)
         self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
         self.timeRangeSlider.setDisabled(True)
         
+        self.addZone = QPushButton('Add zone')
+        self.addZone.setDisabled(True)
         self.map = QLabel()
         self.drawMap()
         self.areaButtons()
@@ -70,7 +112,9 @@ class MainWindow(QMainWindow):
         self.areaBtn['Row'].toggled.connect(self.rowMapButtons)
         self.areaBtn['Square'].toggled.connect(self.squareMapButtons)
                 
-        self.getFileButton.clicked.connect(self.getFile)
+        getFileButton.clicked.connect(self.getFile)
+        self.addZone.clicked.connect(self.addNewZone)
+        
         # Check if input is correct
         self.startTime.textEdited.connect(lambda: self.checkCorrect(self.startTime))
         self.endTime.textEdited.connect(lambda: self.checkCorrect(self.endTime))
@@ -86,24 +130,31 @@ class MainWindow(QMainWindow):
         timeRangeLayout.addWidget(self.endTime, 0, 1, Qt.AlignRight)
         timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 2, Qt.AlignBottom)
         
-        controlLayout.addWidget(self.getFileButton, 0, 0, 1, 2)
+        controlLayout.addWidget(getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
         controlLayout.addWidget(self.fileName, 1, 0, 1, 2, Qt.AlignTop)
-        controlLayout.addLayout(self.areaButtonLayout, 2, 0, 1, 1, Qt.AlignLeft)
-        controlLayout.addWidget(self.map, 2, 1, 1, 1, Qt.AlignHCenter)
-        controlLayout.addLayout(timeRangeLayout, 3, 0, 1, 2, Qt.AlignBottom)
+        controlLayout.addWidget(self.addZone, 2, 0, 1, 2, Qt.AlignRight)
+        controlLayout.addLayout(self.areaButtonLayout, 3, 0, 1, 1, Qt.AlignLeft)
+        controlLayout.addWidget(self.map, 3, 1, 1, 1, Qt.AlignHCenter)
+        controlLayout.addLayout(periodLayout, 4, 0, 1, 2, Qt.AlignRight)
+        controlLayout.addLayout(timeRangeLayout, 5, 0, 1, 2, Qt.AlignBottom)
         
-        dataLayout.addWidget(self.totalTime)
-        dataLayout.addWidget(self.totalDistance)
-        dataLayout.addWidget(self.totalVelocity)
-        dataLayout.addWidget(self.totalRearings)
-        dataLayout.addSpacing(QFontMetrics(QFont()).height())
-        dataLayout.addWidget(self.selectedTime)
-        dataLayout.addWidget(self.selectedDistance)
-        dataLayout.addWidget(self.selectedVelocity)
-        dataLayout.addWidget(self.selectedRearings)
+        # dataLayout.addWidget(self.totalTime)
+        # dataLayout.addWidget(self.totalDistance)
+        # dataLayout.addWidget(self.totalVelocity)
+        # dataLayout.addWidget(self.totalRearings)
+        # dataLayout.addSpacing(QFontMetrics(QFont()).height())
+        # dataLayout.addWidget(self.selectedTime)
+        # dataLayout.addWidget(self.selectedDistance)
+        # dataLayout.addWidget(self.selectedVelocity)
+        # dataLayout.addWidget(self.selectedRearings)
+        
+        dataLayout.addWidget(self.table)
+        dataLayout.addWidget(self.saveButton)
         
         generalLayout.addLayout(controlLayout)
         generalLayout.addLayout(dataLayout)
+        # generalLayout.addWidget(self.table, Qt.AlignCenter)
+        # generalLayout.setSizeConstraint(QLayout.SetMinimumSize)
                 
         container = QWidget()
         container.setLayout(generalLayout)
@@ -122,25 +173,42 @@ class MainWindow(QMainWindow):
         self.drawPath(0, self.df.index[-1])
         
     def totalStat(self):
-        self.totalTime.setText(f"Total time: {self.stat.totalTime} s")
-        self.totalDistance.setText(f"Total distance: {self.stat.totalDistance} cm")
-        self.totalVelocity.setText(f"Total velocity: {self.stat.totalVelocity} cm/s")
-        self.totalRearings.setText(f"Total rearings: {self.stat.totalRearings}")
+        # self.totalTime.setText(f"Total time: {self.stat.totalTime} s")
+        # self.totalDistance.setText(f"Total distance: {self.stat.totalDistance} cm")
+        # self.totalVelocity.setText(f"Total velocity: {self.stat.totalVelocity} cm/s")
+        # self.totalRearings.setText(f"Total rearings: {self.stat.totalRearings}")
+        
+        item = QTableWidgetItem(str(self.stat.totalTime))
+        self.table.setItem(0, 0, item)
+        item = QTableWidgetItem(str(self.stat.totalDistance))
+        self.table.setItem(1, 0, item)
+        item = QTableWidgetItem(str(self.stat.totalVelocity))
+        self.table.setItem(2, 0, item)
+        item = QTableWidgetItem(str(self.stat.totalRearings))
+        self.table.setItem(3, 0, item)
         
     def selectedStat(self, start, end):
         iStart = self.stat.timePoint(self.df, start)
         iEnd = self.stat.timePoint(self.df, end)
         
-        self.selectedTime.setText(f"Selected time: {start}-{end} s")
+        # self.selectedTime.setText(f"Selected time: {start}-{end} s")
+        item = QTableWidgetItem(f'{start}-{end}')
+        self.table.setItem(4, 0, item)
         
         selectedDistance = self.stat.calcDistance(self.df, iStart, iEnd)
-        self.selectedDistance.setText(f"Selected distance: {selectedDistance} cm")
+        item = QTableWidgetItem(str(selectedDistance))
+        self.table.setItem(5, 0, item)
+        # self.selectedDistance.setText(f"Selected distance: {selectedDistance} cm")
         
         selectedVelocity = self.stat.calcVelocity(start, end, selectedDistance)
-        self.selectedVelocity.setText(f"Selected velocity: {selectedVelocity} cm/s")
+        item = QTableWidgetItem(str(selectedVelocity))
+        self.table.setItem(6, 0, item)
+        # self.selectedVelocity.setText(f"Selected velocity: {selectedVelocity} cm/s")
         
         selectedRearings = self.stat.calcRearings(self.df, iStart, iEnd)
-        self.selectedRearings.setText(f"Selected rearings: {selectedRearings}")
+        item = QTableWidgetItem(str(selectedRearings))
+        self.table.setItem(7, 0, item)
+        # self.selectedRearings.setText(f"Selected rearings: {selectedRearings}")
         
         self.drawPath(iStart, iEnd)
         
@@ -234,13 +302,19 @@ class MainWindow(QMainWindow):
         self.map.setPixmap(canvas)   
         
     def newAreaBtn(self, newBtn):
-        for name in self.areaBtnNames:
-            if name != newBtn:
-                # if button is checked - disable others
-                # if unchecked - enable others
-                isOccupied = self.areaBtn[newBtn].isChecked()
-                self.areaBtn[name].setEnabled(not isOccupied)
-        
+        if self.areaBtn[newBtn].isChecked():
+            self.checkedAreaBtn = newBtn
+            if newBtn in self.multiZone:
+                self.addZone.setEnabled(True)
+            [self.areaBtn[key].setDisabled(True) for key in self.areaBtnNames \
+                                                         if key != newBtn]
+            # if button is checked - disable others
+            # if unchecked - enable others        
+        else:
+            self.checkedAreaBtn = None
+            self.addZone.setDisabled(True)
+            [self.areaBtn[name].setEnabled(True) for name in self.areaBtn]
+            
         # Delete old buttons
         if hasattr(self, 'mapLayout'):
             for i in reversed(range(self.mapLayout.count())):
@@ -285,7 +359,6 @@ class MainWindow(QMainWindow):
         halves[0].setStyleSheet("background-color: rgba(255, 0, 0, 0.3)")
         halves[1].setStyleSheet("background-color: rgba(0, 255, 0, 0.3)")
         
-    
     def hHalfArea(self):
         self.newAreaBtn('Horizontal_halves')
         
@@ -368,6 +441,8 @@ class MainWindow(QMainWindow):
     def areaButtons(self):
         self.areaBtnNames = ['Cell', 'Vertical_halves', 'Horizontal_halves',
                              'Wall', 'Column', 'Row', 'Square']
+        self.multiZone = list(map(self.areaBtnNames.__getitem__, [0, 4, 5, 6]))
+
         self.areaBtn = {}
         numAreaBtn = 7
         for i in range(numAreaBtn):
@@ -387,8 +462,32 @@ class MainWindow(QMainWindow):
         self.areaButtonLayout.setSpacing(int((self.mapSide - (32 * numAreaBtn)) / \
                                          (numAreaBtn - 1)))
         self.areaButtonLayout.setContentsMargins(0, 0, 30, 0)
+        
+    def addNewZone(self):
+        header = QTableWidgetItem('Zone')
+        num = self.table.columnCount()
+        self.table.setColumnCount(num+1)
+        self.table.setHorizontalHeaderItem(num, header)
+        self.table.setFixedWidth(self.tableWidth())
+        self.adjustSize()
+        print('done')
+        
+    def tableWidth(self):
+        tableWidth = self.table.verticalHeader().width() + \
+                     self.table.horizontalHeader().length() + \
+                     self.table.verticalScrollBar().width() + \
+                     self.table.frameWidth() * 2
+        return tableWidth
+    
+class Delegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        super().paint(painter, option, index) 
+        if (index.row() // 4) % 2 == 1:
+            painter.fillRect(option.rect, QColor(200, 200, 200, 100))       
+    
             
 app = QApplication(os.sys.argv)
+app.setStyle(QStyleFactory.create('Fusion'))
 window = MainWindow()
 window.show()
 app.exec()
