@@ -14,6 +14,7 @@ import pandas as pd
 import numpy as np
 
 from OpenFieldStatistics import OFStatistics
+from MapButtonStyleSheet import styleSheet, zoneColors, color
 
 import os
 import re
@@ -23,6 +24,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("OpenField processing")
+        self.setWindowIcon(QIcon('logo.png'))
         self.setGeometry(100, 100, 100, 100)
         
         self.numLasers = 16
@@ -38,21 +40,10 @@ class MainWindow(QMainWindow):
         getFileButton.setFixedWidth(80)
         self.fileName = QLabel()
         
-        periodLayout = QHBoxLayout()
-        timePeriod = QLabel("Time period every ")
-        self.period = QLineEdit(alignment = Qt.AlignRight)
-        self.period.setFixedWidth(60)
-        mins = QLabel(" min")
-        periodLayout.addWidget(timePeriod, alignment = Qt.AlignRight)
-        periodLayout.addWidget(self.period, alignment = Qt.AlignRight)
-        periodLayout.addWidget(mins, alignment = Qt.AlignRight)
-        
         self.numZones = 0
         self.zoneCoord = np.zeros((self.numLasers, self.numLasers))
-        self.zoneColors = [QColor(255, 0, 0, 80), QColor(0, 255, 0, 80),
-                           QColor(0, 0, 255, 80), QColor(100, 0, 100, 80)]
         
-        self.table = QTableWidget(20, 1)
+        self.table = QTableWidget(4, 1)
         
         # Forbid user touch anything in the table
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -74,6 +65,29 @@ class MainWindow(QMainWindow):
                                             'Selected time, s', 'Selected distance, cm', 
                                             'Selected velocity, cm/s', 'Selected rearings'])
         self.table.setHorizontalHeaderLabels(['Whole field'])
+        self.table.setStyleSheet('''
+                                QTableView {
+                                    gridline-color: black;
+                                }
+                                
+                                QHeaderView::section {
+                                    padding: 4px;
+                                    border-style: none;
+                                    border-bottom: 1px solid black;
+                                    border-right: 1px solid black;
+                                }
+                                
+                                QHeaderView::section:horizontal {
+                                    border-top: 1px solid black;
+                                }
+                                
+                                QHeaderView::section:vertical { 
+                                    border-left: 1px solid black; 
+                                }
+                                
+                                QTableWidget QTableCornerButton::section {
+                                    border: 1px solid black;
+                                }''')
         
         self.table.show()
         self.table.setFixedWidth(self.tableWidth())
@@ -103,6 +117,16 @@ class MainWindow(QMainWindow):
         self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
         self.timeRangeSlider.setDisabled(True)
         
+        periodLayout = QHBoxLayout()
+        timePeriod = QLabel("Time period every ")
+        self.period = QLineEdit(alignment = Qt.AlignRight)
+        self.period.setFixedWidth(60)
+        self.period.setDisabled(True)
+        mins = QLabel(" min")
+        periodLayout.addWidget(timePeriod, alignment = Qt.AlignRight)
+        periodLayout.addWidget(self.period, alignment = Qt.AlignRight)
+        periodLayout.addWidget(mins, alignment = Qt.AlignRight)
+        
         self.addZoneBtn = QPushButton('Add zone')
         self.addZoneBtn.setDisabled(True)
         self.map = QLabel()
@@ -121,6 +145,8 @@ class MainWindow(QMainWindow):
         self.addZoneBtn.clicked.connect(self.addNewZone)
         
         # Check if input is correct
+        self.period.textEdited.connect(lambda: self.checkCorrect(self.period, 
+                                                                 period=True))
         self.startTime.textEdited.connect(lambda: self.checkCorrect(self.startTime))
         self.endTime.textEdited.connect(lambda: self.checkCorrect(self.endTime))
         
@@ -225,6 +251,7 @@ class MainWindow(QMainWindow):
         self.startTime.setEnabled(True)
         self.endTime.setEnabled(True)
         self.timeRangeSlider.setEnabled(True)
+        self.period.setEnabled(True)
         
         self.startTime.setText(str(0))
         self.endTime.setText(str(self.stat.totalTime))
@@ -246,7 +273,7 @@ class MainWindow(QMainWindow):
         self.selectedStat(start, end)   
         
     # Check if time range input is correct, delete last char otherwise
-    def checkCorrect(self, lineEdit):
+    def checkCorrect(self, lineEdit, period=False):
         # Correct decimal 
         if not re.match(r'^\d+\.?\d*$', lineEdit.text()):
             lineEdit.backspace()
@@ -254,15 +281,18 @@ class MainWindow(QMainWindow):
         
         # In total time range
         # No need to check for start < 0, we can't enter negative number
-        num = float(lineEdit.text())
+        (num := 60*float(lineEdit.text())) if period \
+                                           else (num := float(lineEdit.text()))
+                                           # period is in minutes, not seconds
         if not num <= self.stat.totalTime:
             lineEdit.backspace()
             return
         
         # start < end
-        if not float(self.startTime.text()) < float(self.endTime.text()):
-            lineEdit.backspace()
-            return
+        if not period:
+            if not float(self.startTime.text()) < float(self.endTime.text()):
+                lineEdit.backspace()
+                return
         
     def updateMap(self):
         start, end = [x/10 for x in self.timeRangeSlider.value()]
@@ -345,8 +375,9 @@ class MainWindow(QMainWindow):
             delattr(self, 'mapLayout')
             
         # Set Style Sheet for all map buttons
-        with open('ButtonStyleSheet.css') as buttonStyleSheet:
-            self.map.setStyleSheet(buttonStyleSheet.read())
+        # with open('ButtonStyleSheet.css') as buttonStyleSheet:
+        # self.map.setStyleSheet(buttonStyleSheet.read())
+        self.map.setStyleSheet(styleSheet(self.numZones))
             
     def addNewZone(self):
         if self.numZones == 4:                 # Maximum 4 zones
@@ -357,22 +388,28 @@ class MainWindow(QMainWindow):
         self.table.setColumnCount(num+1)
         self.table.setHorizontalHeaderItem(num, header)
         self.table.setFixedWidth(self.tableWidth())
+        self.map.setStyleSheet(styleSheet(self.numZones))
         # self.adjustSize()
         
     def mapBtnChecked(self, x=-1, y=-1, s=-1):
         if s != -1:
             self.zoneCoord[[s, -s-1], s:self.numLasers-s] = self.numZones + 1
             self.zoneCoord[s:self.numLasers-s, [s, -s-1]] = self.numZones + 1
-            self.mapButtons[s].setEnabled(False)
+            self.mapButtons[(coord:=s)].setDisabled(True)
         elif y == -1:
             self.zoneCoord[x,:] = self.numZones + 1
-            self.mapButtons[x].setEnabled(False)
+            self.mapButtons[(coord:=x)].setDisabled(True)
         elif x == -1:
             self.zoneCoord[:,y] = self.numZones + 1
-            self.mapButtons[y].setEnabled(False)
+            self.mapButtons[(coord:=y)].setDisabled(True)
         else:
             self.zoneCoord[x][y] = self.numZones + 1
             self.mapButtons[x][y].setEnabled(False)
+            self.mapButtons[x][y].setProperty(f'zone{self.numZones}', True)
+            self.map.setStyleSheet(styleSheet(self.numZones))
+            return
+        self.mapButtons[coord].setProperty(f'zone{self.numZones}', True)
+        self.map.setStyleSheet(styleSheet(self.numZones))
             
     def cellMapButtons(self):        
         self.newAreaBtn('Cell')
@@ -412,8 +449,8 @@ class MainWindow(QMainWindow):
         for half in halves:
             half.setFixedSize(int(self.mapSide / 2), self.mapSide)
             self.mapLayout.addWidget(half)
-        halves[0].setStyleSheet("background-color: rgba(255, 0, 0, 0.3)")
-        halves[1].setStyleSheet("background-color: rgba(0, 255, 0, 0.3)")
+        halves[0].setStyleSheet(f"background-color: rgba({color[0]}, 0.3)")
+        halves[1].setStyleSheet(f"background-color: rgba({color[1]}, 0.3)")
         
     def hHalfArea(self):
         self.newAreaBtn('Horizontal_halves')
@@ -432,8 +469,8 @@ class MainWindow(QMainWindow):
         for half in halves:
             half.setFixedSize(self.mapSide, int(self.mapSide / 2))
             self.mapLayout.addWidget(half)
-        halves[0].setStyleSheet("background-color: rgba(255, 0, 0, 0.3)")
-        halves[1].setStyleSheet("background-color: rgba(0, 255, 0, 0.3)")
+        halves[0].setStyleSheet(f"background-color: rgba({color[0]}, 0.3)")
+        halves[1].setStyleSheet(f"background-color: rgba({color[1]}, 0.3)")
     
     def wallArea(self):
         self.newAreaBtn('Wall')
@@ -452,12 +489,12 @@ class MainWindow(QMainWindow):
         outer = QPushButton()
         outer.setFixedSize(self.mapSide, self.mapSide)
         outer.setMask(pixmap.scaled(outer.size(), Qt.IgnoreAspectRatio).mask())
-        outer.setStyleSheet("background-color: rgba(255, 0, 0, 0.3)")
+        outer.setStyleSheet(f"background-color: rgba({color[0]}, 0.3)")
         self.mapLayout.addWidget(outer, 0, 0)
         
         inner = outer = QPushButton()
         inner.setFixedSize(int(self.mapSide / 2), int(self.mapSide / 2))
-        inner.setStyleSheet("background-color: rgba(0, 255, 0, 0.3)")
+        inner.setStyleSheet(f"background-color: rgba({color[1]}, 0.3)")
         self.mapLayout.addWidget(inner, 0, 0, alignment = Qt.AlignCenter)
 
     def columnMapButtons(self):      
@@ -518,7 +555,6 @@ class MainWindow(QMainWindow):
             self.mapButtons[i].clicked.connect(lambda checked, i=i: 
                                                   self.mapBtnChecked(s=i))
             
-            
     def areaButtons(self):
         self.areaBtnNames = ['Cell', 'Vertical_halves', 'Horizontal_halves',
                              'Wall', 'Column', 'Row', 'Square']
@@ -551,21 +587,19 @@ class MainWindow(QMainWindow):
     
 class Delegate(QStyledItemDelegate):
     
-    columnColor = [QColor(255, 0, 0, 80), QColor(0, 255, 0, 80),
-                   QColor(0, 0, 255, 80), QColor(100, 0, 100, 80)]
-    
     def paint(self, painter, option, index):
         super().paint(painter, option, index) 
         if (index.row() // 4) % 2 == 1:
             painter.fillRect(option.rect, QColor(200, 200, 200, 120))  
         if index.column() == 1:
-            painter.fillRect(option.rect, Delegate.columnColor[0])
+            # painter.fillRect(option.rect, Delegate.columnColor[0])
+            painter.fillRect(option.rect, QColor(*zoneColors[0], 80))
         if index.column() == 2:
-            painter.fillRect(option.rect, Delegate.columnColor[1])
+            painter.fillRect(option.rect, QColor(*zoneColors[1], 80))
         if index.column() == 3:
-            painter.fillRect(option.rect, Delegate.columnColor[2])
+            painter.fillRect(option.rect, QColor(*zoneColors[2], 80))
         if index.column() == 4:
-            painter.fillRect(option.rect, Delegate.columnColor[3])
+            painter.fillRect(option.rect, QColor(*zoneColors[3], 80))
     
             
 app = QApplication(os.sys.argv)
