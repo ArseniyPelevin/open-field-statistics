@@ -12,6 +12,7 @@ from superqt import QRangeSlider
 
 import pandas as pd
 import numpy as np
+import math as m
 
 from OpenFieldStatistics import OFStatistics
 from MapButtonStyleSheet import styleSheet, zoneColors, color
@@ -43,6 +44,8 @@ class MainWindow(QMainWindow):
         self.numZones = 0
         self.zoneCoord = np.zeros((self.numLasers, self.numLasers))
         
+        self.hasSelectedStat = False
+        
         self.table = QTableWidget(4, 1)
         
         # Forbid user touch anything in the table
@@ -55,15 +58,11 @@ class MainWindow(QMainWindow):
         self.table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-        header = QTableWidgetItem()
-        header.setBackground(QColor(200, 200, 200, 100))
-        self.table.setVerticalHeaderItem(3, header)
+
         self.table.setItemDelegate(Delegate(self.table))
 
         self.table.setVerticalHeaderLabels(['Total time, s', 'Total distance, cm', 
-                                            'Total velocity, cm/s', 'Total rearings',
-                                            'Selected time, s', 'Selected distance, cm', 
-                                            'Selected velocity, cm/s', 'Selected rearings'])
+                                            'Total velocity, cm/s', 'Total rearings'])
         self.table.setHorizontalHeaderLabels(['Whole field'])
         self.table.setStyleSheet('''
                                 QTableView {
@@ -85,9 +84,17 @@ class MainWindow(QMainWindow):
                                     border-left: 1px solid black; 
                                 }
                                 
+                                QHeaderView::background-color:grey {
+                                    background-color: 200, 200, 200, 0,5;
+                                }
+                                
                                 QTableWidget QTableCornerButton::section {
                                     border: 1px solid black;
                                 }''')
+                                
+        # header = QTableWidgetItem()
+        self.table.verticalHeaderItem(3).setBackground(QColor(200, 200, 200, 100))
+        # self.table.setVerticalHeaderItem(3, header)
         
         self.table.show()
         self.table.setFixedWidth(self.tableWidth())
@@ -119,12 +126,12 @@ class MainWindow(QMainWindow):
         
         periodLayout = QHBoxLayout()
         timePeriod = QLabel("Time period every ")
-        self.period = QLineEdit(alignment = Qt.AlignRight)
-        self.period.setFixedWidth(60)
-        self.period.setDisabled(True)
+        self.periodLine = QLineEdit(alignment = Qt.AlignRight)
+        self.periodLine.setFixedWidth(60)
+        self.periodLine.setDisabled(True)
         mins = QLabel(" min")
         periodLayout.addWidget(timePeriod, alignment = Qt.AlignRight)
-        periodLayout.addWidget(self.period, alignment = Qt.AlignRight)
+        periodLayout.addWidget(self.periodLine, alignment = Qt.AlignRight)
         periodLayout.addWidget(mins, alignment = Qt.AlignRight)
         
         self.addZoneBtn = QPushButton('Add zone')
@@ -145,12 +152,13 @@ class MainWindow(QMainWindow):
         self.addZoneBtn.clicked.connect(self.addNewZone)
         
         # Check if input is correct
-        self.period.textEdited.connect(lambda: self.checkCorrect(self.period, 
+        self.periodLine.textEdited.connect(lambda: self.checkCorrect(self.periodLine, 
                                                                  period=True))
         self.startTime.textEdited.connect(lambda: self.checkCorrect(self.startTime))
         self.endTime.textEdited.connect(lambda: self.checkCorrect(self.endTime))
         
         # Now update time range from text
+        self.periodLine.editingFinished.connect(self.updatePeriod)
         self.startTime.editingFinished.connect(self.textUpdateTimeRange)
         self.endTime.editingFinished.connect(self.textUpdateTimeRange)
         # Update time range from slider
@@ -222,6 +230,15 @@ class MainWindow(QMainWindow):
         iStart = self.stat.timePoint(self.df, start)
         iEnd = self.stat.timePoint(self.df, end)
         
+        if not self.hasSelectedStat:
+            headers = ['Selected time, s', 'Selected distance, cm', 
+                       'Selected velocity, cm/s', 'Selected rearings']
+            headers = list(map(QTableWidgetItem, headers))
+            for i in range(4):
+                self.table.insertRow(i+4)
+                self.table.setVerticalHeaderItem(i+4, headers[i])
+        self.hasSelectedStat = True
+        
         # self.selectedTime.setText(f"Selected time: {start}-{end} s")
         item = QTableWidgetItem(f'{start}-{end}')
         self.table.setItem(4, 0, item)
@@ -251,10 +268,34 @@ class MainWindow(QMainWindow):
         self.startTime.setEnabled(True)
         self.endTime.setEnabled(True)
         self.timeRangeSlider.setEnabled(True)
-        self.period.setEnabled(True)
+        self.periodLine.setEnabled(True)
         
         self.startTime.setText(str(0))
         self.endTime.setText(str(self.stat.totalTime))
+        
+    def updatePeriod(self):
+        self.table.setRowCount(4 + 4 * self.hasSelectedStat)
+        
+        self.period = float(self.periodLine.text())
+        numPeriods = m.ceil(self.stat.totalTime / (self.period * 60))
+        for i in range(numPeriods):
+            timeStart = round(i * self.period * 60, 1)
+            timeEnd = round((i+1) * self.period * 60, 1)
+            if timeEnd > self.stat.totalTime:
+                timeEnd = self.stat.totalTime
+            numRows = self.table.rowCount()
+            self.table.setRowCount(numRows+4)
+            self.table.setVerticalHeaderItem(numRows, 
+                            QTableWidgetItem(f'{timeStart}-{timeEnd} s'))
+            self.table.setVerticalHeaderItem(numRows+1, 
+                            QTableWidgetItem('Distance, cm'))
+            self.table.setVerticalHeaderItem(numRows+2, 
+                            QTableWidgetItem('Velocity, cm/s'))
+            self.table.setVerticalHeaderItem(numRows+3, 
+                            QTableWidgetItem('Rearings'))
+            if (numRows // 4) % 2 == 0:
+                for h in range(4):
+                    self.table.verticalHeaderItem(numRows + h).setBackground(Qt.black)
         
     def sliderUpdateTimeRange(self):
         start, end = [x/10 for x in self.timeRangeSlider.value()]

@@ -1,9 +1,7 @@
-import pandas as pd
-
 from datetime import datetime, timedelta
 
-import math as m
-import statistics as st
+from math import dist
+from statistics import fmean
 
 class OFStatistics():
     def __init__(self, df):
@@ -54,16 +52,16 @@ class OFStatistics():
         for i, row in df.iterrows():
             
             # calculate central point of animal
-            df.at[i, 'X'] = st.fmean([row['X1'], row['X2']])
-            df.at[i, 'Y'] = st.fmean([row['Y1'], row['Y2']])
+            df.at[i, 'X'] = fmean([row['X1'], row['X2']])
+            df.at[i, 'Y'] = fmean([row['Y1'], row['Y2']])
             
             if i == 0: continue
             p = [df.at[i-1, 'X'], df.at[i-1, 'Y']]   # previous point
             q = [df.at[i, 'X'], df.at[i, 'Y']]       # current point
-            dist = m.dist(p, q) * (40 / 16)
+            distance = dist(p, q) * (40 / 16)
             # 40 cm - edge of OpenField box, 16 - number of cells
-            df.at[i, 'dist'] = dist                  # dist since last point
-            totalDistance += dist
+            df.at[i, 'dist'] = distance                  # dist since last point
+            totalDistance += distance
         totalDistance = round(totalDistance, 1)
                 
         print(f'Total distance: {totalDistance} cm')
