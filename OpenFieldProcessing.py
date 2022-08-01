@@ -30,29 +30,59 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon('logo.png'))
         self.setGeometry(100, 100, 100, 100)
         
+        self.setVariables()
+        self.setWidgets()
+        self.setSignals()
+        self.setLayouts()
+        
+    def setVariables(self):
         self.param = {'numLasers': 16, 'mapSide': 320, 
                       'boxSide': 40, 'numStatParam': 4}
         self.numLasers = 16
         self.mapSide = 320 # px
         self.numStatParam = 4  # Time, distance, velocity, rearings
         self.statParam = ['time', 'dist', 'vel', 'rear']
-        
-        generalLayout = QHBoxLayout()
-        controlLayout = QGridLayout()
-        timeRangeLayout = QGridLayout()
-        dataLayout = QVBoxLayout()
-        self.areaButtonLayout = QVBoxLayout()
-        
-        self.getFileButton = QPushButton("Select file")
-        self.getFileButton.setFixedWidth(80)
-        self.fileName = QLabel()
-        
+
         # OFStatistics.table(zones) default values
         self.zoneCoord = np.ones((self.numLasers, self.numLasers))     
         self.numZones = 0
         
         self.hasSelectedStat = False
+    
+    def setWidgets(self):
+        self.getFileButton = QPushButton("Select file")
+        self.getFileButton.setFixedWidth(80)
+        self.fileName = QLabel()
         
+        self.startTime = QLineEdit(alignment = Qt.AlignLeft)
+        self.startTime.setFixedWidth(60)
+        self.startTime.setDisabled(True)
+        self.endTime = QLineEdit(alignment = Qt.AlignRight)
+        self.endTime.setFixedWidth(60)
+        self.endTime.setDisabled(True)
+        self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
+        self.timeRangeSlider.setDisabled(True)
+        
+        self.timePeriod = QLabel("Time period every ")
+        self.periodLine = QLineEdit(alignment = Qt.AlignRight)
+        self.periodLine.setFixedWidth(60)
+        self.periodLine.setDisabled(True)
+        self.mins = QLabel(" min")
+        
+        self.addZoneBtn = QPushButton('Add zone')
+        self.addZoneBtn.setFixedWidth(80)
+        self.addZoneBtn.setDisabled(True)
+        
+        self.saveButton = QPushButton('Save data')
+        self.saveButton.setFixedWidth(80)
+        self.saveButton.setDisabled(True)
+        
+        self.areaButtons()
+        self.map = QLabel()
+        self.drawMap()
+        self.setTable()
+        
+    def setTable(self):
         self.table = QTableWidget(self.numStatParam, 1)
         
         # Forbid user touch anything in the table
@@ -106,49 +136,11 @@ class MainWindow(QMainWindow):
         self.table.show()
         self.table.setFixedWidth(self.tableWidth())
         self.adjustSize()
-        
-        self.saveButton = QPushButton('Save data')
-        self.saveButton.setFixedWidth(80)
-        self.saveButton.setDisabled(True)
-        
-        # self.table.setHorizontalHeaderItem(1, QTableWidgetItem('new'))
-        # self.table.setHorizontalHeader(header)      
-        
-        # self.totalTime = QLabel("Total time:")
-        # self.totalDistance = QLabel("Total distance:") 
-        # self.totalVelocity = QLabel("Total velocity:")
-        # self.totalRearings = QLabel("Total rearings:")
-        
-        # self.selectedTime = QLabel("Selected time:")
-        # self.selectedDistance = QLabel("Selected distance:")
-        # self.selectedVelocity = QLabel("Selected velocity:")
-        # self.selectedRearings = QLabel("Selected rearings:")
-        
-        self.startTime = QLineEdit(alignment = Qt.AlignLeft)
-        self.startTime.setFixedWidth(60)
-        self.startTime.setDisabled(True)
-        self.endTime = QLineEdit(alignment = Qt.AlignRight)
-        self.endTime.setFixedWidth(60)
-        self.endTime.setDisabled(True)
-        self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
-        self.timeRangeSlider.setDisabled(True)
-        
-        periodLayout = QHBoxLayout()
-        timePeriod = QLabel("Time period every ")
-        self.periodLine = QLineEdit(alignment = Qt.AlignRight)
-        self.periodLine.setFixedWidth(60)
-        self.periodLine.setDisabled(True)
-        mins = QLabel(" min")
-        periodLayout.addWidget(timePeriod, alignment = Qt.AlignRight)
-        periodLayout.addWidget(self.periodLine, alignment = Qt.AlignRight)
-        periodLayout.addWidget(mins, alignment = Qt.AlignRight)
-        
-        self.addZoneBtn = QPushButton('Add zone')
-        self.addZoneBtn.setFixedWidth(80)
-        self.addZoneBtn.setDisabled(True)
-        self.map = QLabel()
-        self.drawMap()
-        self.areaButtons()
+    
+    def setSignals(self):
+        self.getFileButton.clicked.connect(self.getFile)
+        self.addZoneBtn.clicked.connect(self.addNewZone)
+        self.saveButton.clicked.connect(self.saveData)
         
         self.areaBtn['Cell'].toggled.connect(self.cellMapButtons)
         self.areaBtn['Vertical_halves'].toggled.connect(self.vHalfArea)
@@ -157,9 +149,6 @@ class MainWindow(QMainWindow):
         self.areaBtn['Column'].toggled.connect(self.columnMapButtons)
         self.areaBtn['Row'].toggled.connect(self.rowMapButtons)
         self.areaBtn['Square'].toggled.connect(self.squareMapButtons)
-                
-        self.getFileButton.clicked.connect(self.getFile)
-        self.addZoneBtn.clicked.connect(self.addNewZone)
         
         # Check if input is correct
         self.periodLine.textEdited.connect(lambda: self.checkCorrect(self.periodLine, 
@@ -167,20 +156,26 @@ class MainWindow(QMainWindow):
         self.startTime.textEdited.connect(lambda: self.checkCorrect(self.startTime))
         self.endTime.textEdited.connect(lambda: self.checkCorrect(self.endTime))
         
-        # Now update time range from text
+        # Update time range from text
         self.periodLine.editingFinished.connect(self.updatePeriod)
         self.startTime.editingFinished.connect(self.textUpdateTimeRange)
         self.endTime.editingFinished.connect(self.textUpdateTimeRange)
         # Update time range from slider
         self.timeRangeSlider.sliderMoved.connect(self.updateMap)
         self.timeRangeSlider.sliderReleased.connect(self.sliderUpdateTimeRange)  
-        
-        self.saveButton.clicked.connect(self.saveData)
-               
+    
+    def setLayouts(self):
+        timeRangeLayout = QGridLayout()
         timeRangeLayout.addWidget(self.startTime, 0, 0, Qt.AlignLeft)
         timeRangeLayout.addWidget(self.endTime, 0, 1, Qt.AlignRight)
         timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 2, Qt.AlignBottom)
         
+        periodLayout = QHBoxLayout()
+        periodLayout.addWidget(self.timePeriod, alignment = Qt.AlignRight)
+        periodLayout.addWidget(self.periodLine, alignment = Qt.AlignRight)
+        periodLayout.addWidget(self.mins, alignment = Qt.AlignRight)
+        
+        controlLayout = QGridLayout()
         controlLayout.addWidget(self.getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
         controlLayout.addWidget(self.fileName, 1, 0, 1, 2, Qt.AlignTop)
         controlLayout.addWidget(self.addZoneBtn, 2, 0, 1, 2, Qt.AlignRight)
@@ -189,19 +184,11 @@ class MainWindow(QMainWindow):
         controlLayout.addLayout(periodLayout, 4, 0, 1, 2, Qt.AlignRight)
         controlLayout.addLayout(timeRangeLayout, 5, 0, 1, 2, Qt.AlignBottom)
         
-        # dataLayout.addWidget(self.totalTime)
-        # dataLayout.addWidget(self.totalDistance)
-        # dataLayout.addWidget(self.totalVelocity)
-        # dataLayout.addWidget(self.totalRearings)
-        # dataLayout.addSpacing(QFontMetrics(QFont()).height())
-        # dataLayout.addWidget(self.selectedTime)
-        # dataLayout.addWidget(self.selectedDistance)
-        # dataLayout.addWidget(self.selectedVelocity)
-        # dataLayout.addWidget(self.selectedRearings)
-        
+        dataLayout = QVBoxLayout()
         dataLayout.addWidget(self.table)
         dataLayout.addWidget(self.saveButton)
         
+        generalLayout = QHBoxLayout()
         generalLayout.addLayout(controlLayout)
         generalLayout.addLayout(dataLayout)
         # generalLayout.addWidget(self.table, Qt.AlignCenter)
@@ -657,6 +644,7 @@ class MainWindow(QMainWindow):
                                                   self.mapBtnChecked(s=i))
             
     def areaButtons(self):
+        self.areaButtonLayout = QVBoxLayout()
         self.areaBtnNames = ['Cell', 'Vertical_halves', 'Horizontal_halves',
                              'Wall', 'Column', 'Row', 'Square']
         self.areaBtn = {}
