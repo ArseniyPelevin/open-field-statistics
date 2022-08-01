@@ -13,8 +13,10 @@ from superqt import QRangeSlider
 import pandas as pd
 import numpy as np
 import math as m
+import csv
 
 from OpenFieldStatistics import OFStatistics
+# from NewStatistics import OFStatistics
 from MapButtonStyleSheet import styleSheet, zoneColors, color
 
 import os
@@ -28,8 +30,12 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon('logo.png'))
         self.setGeometry(100, 100, 100, 100)
         
+        self.param = {'numLasers': 16, 'mapSide': 320, 
+                      'boxSide': 40, 'numStatParam': 4}
         self.numLasers = 16
         self.mapSide = 320 # px
+        self.numStatParam = 4  # Time, distance, velocity, rearings
+        self.statParam = ['time', 'dist', 'vel', 'rear']
         
         generalLayout = QHBoxLayout()
         controlLayout = QGridLayout()
@@ -37,16 +43,17 @@ class MainWindow(QMainWindow):
         dataLayout = QVBoxLayout()
         self.areaButtonLayout = QVBoxLayout()
         
-        getFileButton = QPushButton("Select file")
-        getFileButton.setFixedWidth(80)
+        self.getFileButton = QPushButton("Select file")
+        self.getFileButton.setFixedWidth(80)
         self.fileName = QLabel()
         
+        # OFStatistics.table(zones) default values
+        self.zoneCoord = np.ones((self.numLasers, self.numLasers))     
         self.numZones = 0
-        self.zoneCoord = np.zeros((self.numLasers, self.numLasers))
         
         self.hasSelectedStat = False
         
-        self.table = QTableWidget(4, 1)
+        self.table = QTableWidget(self.numStatParam, 1)
         
         # Forbid user touch anything in the table
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -93,7 +100,7 @@ class MainWindow(QMainWindow):
                                 }''')
                                 
         # header = QTableWidgetItem()
-        self.table.verticalHeaderItem(3).setBackground(QColor(200, 200, 200, 100))
+        # self.table.verticalHeaderItem(3).setBackground(QColor(200, 200, 200, 100))
         # self.table.setVerticalHeaderItem(3, header)
         
         self.table.show()
@@ -101,6 +108,8 @@ class MainWindow(QMainWindow):
         self.adjustSize()
         
         self.saveButton = QPushButton('Save data')
+        self.saveButton.setFixedWidth(80)
+        self.saveButton.setDisabled(True)
         
         # self.table.setHorizontalHeaderItem(1, QTableWidgetItem('new'))
         # self.table.setHorizontalHeader(header)      
@@ -135,6 +144,7 @@ class MainWindow(QMainWindow):
         periodLayout.addWidget(mins, alignment = Qt.AlignRight)
         
         self.addZoneBtn = QPushButton('Add zone')
+        self.addZoneBtn.setFixedWidth(80)
         self.addZoneBtn.setDisabled(True)
         self.map = QLabel()
         self.drawMap()
@@ -148,7 +158,7 @@ class MainWindow(QMainWindow):
         self.areaBtn['Row'].toggled.connect(self.rowMapButtons)
         self.areaBtn['Square'].toggled.connect(self.squareMapButtons)
                 
-        getFileButton.clicked.connect(self.getFile)
+        self.getFileButton.clicked.connect(self.getFile)
         self.addZoneBtn.clicked.connect(self.addNewZone)
         
         # Check if input is correct
@@ -163,13 +173,15 @@ class MainWindow(QMainWindow):
         self.endTime.editingFinished.connect(self.textUpdateTimeRange)
         # Update time range from slider
         self.timeRangeSlider.sliderMoved.connect(self.updateMap)
-        self.timeRangeSlider.sliderReleased.connect(self.sliderUpdateTimeRange)        
+        self.timeRangeSlider.sliderReleased.connect(self.sliderUpdateTimeRange)  
+        
+        self.saveButton.clicked.connect(self.saveData)
                
         timeRangeLayout.addWidget(self.startTime, 0, 0, Qt.AlignLeft)
         timeRangeLayout.addWidget(self.endTime, 0, 1, Qt.AlignRight)
         timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 2, Qt.AlignBottom)
         
-        controlLayout.addWidget(getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
+        controlLayout.addWidget(self.getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
         controlLayout.addWidget(self.fileName, 1, 0, 1, 2, Qt.AlignTop)
         controlLayout.addWidget(self.addZoneBtn, 2, 0, 1, 2, Qt.AlignRight)
         controlLayout.addLayout(self.areaButtonLayout, 3, 0, 1, 1, Qt.AlignLeft)
@@ -201,32 +213,43 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
         
     def getFile(self):
-        # self.file, _filter = QFileDialog.getOpenFileName(self, "Open .csv file", 
-        #                      r"C:\OpenField\Data1.csv", "CSV files (*.csv)")
+        # self.inputFile, _filter = QFileDialog.getOpenFileName(self, 
+        #                      'Open .csv file', 
+        #                      os.path.join('C:', 'OpenField', 'Data1.csv'), 
+        #                      'CSV files (*.csv)')
         file = r"C:\OpenField\Data1.csv"
-        self.fileName.setText(file)
+        self.inputFile = file
+        self.fileName.setText(file)           
         self.df = pd.read_csv(file, delimiter=";")
-        self.stat = OFStatistics(self.df) 
+        self.stat = OFStatistics(self.df, self.param) 
+        # self.stat = OFStatistics(file)
         self.totalStat()
         self.setTimeRange()
         self.drawPath(0, self.df.index[-1])
         
-    def totalStat(self):
-        # self.totalTime.setText(f"Total time: {self.stat.totalTime} s")
-        # self.totalDistance.setText(f"Total distance: {self.stat.totalDistance} cm")
-        # self.totalVelocity.setText(f"Total velocity: {self.stat.totalVelocity} cm/s")
-        # self.totalRearings.setText(f"Total rearings: {self.stat.totalRearings}")
+        # OFStatistics.table() default values
+        self.startSelected = 0
+        self.endSelected = self.stat.totalTime
+        self.period = self.stat.totalTime
+        self.numPeriods = 1
         
-        item = QTableWidgetItem(str(self.stat.totalTime))
-        self.table.setItem(0, 0, item)
-        item = QTableWidgetItem(str(self.stat.totalDistance))
-        self.table.setItem(1, 0, item)
-        item = QTableWidgetItem(str(self.stat.totalVelocity))
-        self.table.setItem(2, 0, item)
-        item = QTableWidgetItem(str(self.stat.totalRearings))
-        self.table.setItem(3, 0, item)
+        self.fillTable()
+        self.saveButton.setEnabled(True)
+        
+    def totalStat(self):
+        pass
+        # item = QTableWidgetItem(str(self.stat.totalTime))
+        # self.table.setItem(0, 0, item)
+        # item = QTableWidgetItem(str(self.stat.totalDistance))
+        # self.table.setItem(1, 0, item)
+        # item = QTableWidgetItem(str(self.stat.totalVelocity))
+        # self.table.setItem(2, 0, item)
+        # item = QTableWidgetItem(str(self.stat.totalRearings))
+        # self.table.setItem(3, 0, item)
         
     def selectedStat(self, start, end):
+        n = self.numStatParam
+        
         iStart = self.stat.timePoint(self.df, start)
         iEnd = self.stat.timePoint(self.df, end)
         
@@ -234,29 +257,29 @@ class MainWindow(QMainWindow):
             headers = ['Selected time, s', 'Selected distance, cm', 
                        'Selected velocity, cm/s', 'Selected rearings']
             headers = list(map(QTableWidgetItem, headers))
-            for i in range(4):
-                self.table.insertRow(i+4)
-                self.table.setVerticalHeaderItem(i+4, headers[i])
+            for i in range(n):
+                self.table.insertRow(i+n)
+                self.table.setVerticalHeaderItem(i+n, headers[i])
         self.hasSelectedStat = True
         
-        # self.selectedTime.setText(f"Selected time: {start}-{end} s")
-        item = QTableWidgetItem(f'{start}-{end}')
-        self.table.setItem(4, 0, item)
+        # item = QTableWidgetItem(f'{start}-{end}')
+        # self.table.setItem(n, 0, item)
         
-        selectedDistance = self.stat.calcDistance(self.df, iStart, iEnd)
-        item = QTableWidgetItem(str(selectedDistance))
-        self.table.setItem(5, 0, item)
-        # self.selectedDistance.setText(f"Selected distance: {selectedDistance} cm")
+        # selectedDistance = self.stat.calcDistance(self.df, iStart, iEnd)
+        # item = QTableWidgetItem(str(selectedDistance))
+        # self.table.setItem(n+1, 0, item)   
         
-        selectedVelocity = self.stat.calcVelocity(start, end, selectedDistance)
-        item = QTableWidgetItem(str(selectedVelocity))
-        self.table.setItem(6, 0, item)
-        # self.selectedVelocity.setText(f"Selected velocity: {selectedVelocity} cm/s")
+        # selectedVelocity = self.stat.calcVelocity(start, end, selectedDistance)
+        # item = QTableWidgetItem(str(selectedVelocity))
+        # self.table.setItem(n+2, 0, item)        
         
-        selectedRearings = self.stat.calcRearings(self.df, iStart, iEnd)
-        item = QTableWidgetItem(str(selectedRearings))
-        self.table.setItem(7, 0, item)
-        # self.selectedRearings.setText(f"Selected rearings: {selectedRearings}")
+        # selectedRearings = self.stat.calcRearings(self.df, iStart, iEnd)
+        # item = QTableWidgetItem(str(selectedRearings))
+        # self.table.setItem(n+3, 0, item)
+        
+        self.startSelected = start
+        self.endSelected = end
+        self.fillTable()
         
         self.drawPath(iStart, iEnd)
         
@@ -274,17 +297,28 @@ class MainWindow(QMainWindow):
         self.endTime.setText(str(self.stat.totalTime))
         
     def updatePeriod(self):
-        self.table.setRowCount(4 + 4 * self.hasSelectedStat)
+        n = self.numStatParam
+        self.table.setRowCount(n + n * self.hasSelectedStat)
         
-        self.period = float(self.periodLine.text())
-        numPeriods = m.ceil(self.stat.totalTime / (self.period * 60))
-        for i in range(numPeriods):
-            timeStart = round(i * self.period * 60, 1)
-            timeEnd = round((i+1) * self.period * 60, 1)
+        try:
+            self.period = float(self.periodLine.text())
+            self.period = round(self.period * 60, 1)  # User enters minutes
+        except ValueError:  # Empty line
+            self.period = 0
+        selectedInterval = round(self.endSelected-self.startSelected, 1)
+        if self.period == 0 or self.period == selectedInterval:
+            self.period = selectedInterval  # default value
+            self.fillTable()
+            return
+        
+        self.numPeriods = m.ceil(selectedInterval / self.period)
+        for i in range(self.numPeriods):
+            timeStart = round(i * self.period, 1)
+            timeEnd = round((i+1) * self.period, 1)
             if timeEnd > self.stat.totalTime:
                 timeEnd = self.stat.totalTime
             numRows = self.table.rowCount()
-            self.table.setRowCount(numRows+4)
+            self.table.setRowCount(numRows+n)
             self.table.setVerticalHeaderItem(numRows, 
                             QTableWidgetItem(f'{timeStart}-{timeEnd} s'))
             self.table.setVerticalHeaderItem(numRows+1, 
@@ -293,9 +327,11 @@ class MainWindow(QMainWindow):
                             QTableWidgetItem('Velocity, cm/s'))
             self.table.setVerticalHeaderItem(numRows+3, 
                             QTableWidgetItem('Rearings'))
-            if (numRows // 4) % 2 == 0:
-                for h in range(4):
-                    self.table.verticalHeaderItem(numRows + h).setBackground(Qt.black)
+            # if (numRows // n) % 2 == 0:
+            #     for h in range(n):
+            #         self.table.verticalHeaderItem(numRows + h).setBackground(Qt.black)
+            
+        self.fillTable()
         
     def sliderUpdateTimeRange(self):
         start, end = [x/10 for x in self.timeRangeSlider.value()]
@@ -315,23 +351,27 @@ class MainWindow(QMainWindow):
         
     # Check if time range input is correct, delete last char otherwise
     def checkCorrect(self, lineEdit, period=False):
-        # Correct decimal 
+        # Not a decimal 
         if not re.match(r'^\d+\.?\d*$', lineEdit.text()):
             lineEdit.backspace()
             return 
         
-        # In total time range
+        # period is in minutes, not seconds
+        num = 60*float(lineEdit.text()) if period else float(lineEdit.text())
+        
+        # Out of total time range
         # No need to check for start < 0, we can't enter negative number
-        (num := 60*float(lineEdit.text())) if period \
-                                           else (num := float(lineEdit.text()))
-                                           # period is in minutes, not seconds
-        if not num <= self.stat.totalTime:
+        if num > self.stat.totalTime:
             lineEdit.backspace()
             return
         
-        # start < end
-        if not period:
-            if not float(self.startTime.text()) < float(self.endTime.text()):
+        # period > selected time interval
+        if period and num > round(self.endSelected-self.startSelected, 1):
+            lineEdit.backspace()
+            return
+        
+        # start > end
+        if not float(self.startTime.text()) < float(self.endTime.text()):
                 lineEdit.backspace()
                 return
         
@@ -384,13 +424,13 @@ class MainWindow(QMainWindow):
         if self.areaBtn[newBtn].isChecked():
             self.checkedAreaBtn = newBtn
             self.mapButtons = []
-            if newBtn in multiZone:
-            # There can be 1-4 zones
-                self.addZoneBtn.setEnabled(True)
-            else:
+            self.zoneCoord = np.zeros((self.numLasers, self.numLasers))
+            if newBtn not in multiZone:
             # There will be only 2 zones
-                self.addNewZone()
-                self.addNewZone()
+                self.addNewZone(fillTable=False)
+                self.addNewZone(fillTable=False)
+                # Will fill table from specific area function,
+                # after updating zoneCoord
             [self.areaBtn[key].setDisabled(True) for key in self.areaBtnNames \
                                                          if key != newBtn]
             # if button is checked - disable others
@@ -411,7 +451,8 @@ class MainWindow(QMainWindow):
             
             self.table.setColumnCount(1)
             self.numZones = 0
-            self.zoneCoord = np.zeros((self.numLasers, self.numLasers))
+            self.zoneCoord = np.ones((self.numLasers, self.numLasers)) 
+            self.fillTable()
             self.table.setFixedWidth(self.tableWidth())
             delattr(self, 'mapLayout')
             
@@ -420,30 +461,43 @@ class MainWindow(QMainWindow):
         # self.map.setStyleSheet(buttonStyleSheet.read())
         self.map.setStyleSheet(styleSheet(self.numZones))
             
-    def addNewZone(self):
+    @pyqtSlot()    
+    def addNewZone(self, fillTable=True):
         if self.numZones == 4:                 # Maximum 4 zones
             return
         self.numZones += 1
+        
+        # Add new table column
         header = QTableWidgetItem(f'Zone {self.numZones}')
         num = self.table.columnCount()
         self.table.setColumnCount(num+1)
         self.table.setHorizontalHeaderItem(num, header)
         self.table.setFixedWidth(self.tableWidth())
         self.map.setStyleSheet(styleSheet(self.numZones))
+        
+        self.addZoneBtn.setDisabled(True)
+        # We should't be able to add empty zone before we selected some new area
+        if fillTable:
+            self.fillTable()
         # self.adjustSize()
         
     def mapBtnChecked(self, x=-1, y=-1, s=-1):
-        if s != -1:
+        if self.numZones == 4:
+            return
+        self.addZoneBtn.setEnabled(True)
+        # Now that we selected new area we can add it to new zone
+        
+        if s != -1:  # Square map button
             self.zoneCoord[[s, -s-1], s:self.numLasers-s] = self.numZones + 1
             self.zoneCoord[s:self.numLasers-s, [s, -s-1]] = self.numZones + 1
             self.mapButtons[(coord:=s)].setDisabled(True)
-        elif y == -1:
+        elif y == -1:  # Row map button
             self.zoneCoord[x,:] = self.numZones + 1
             self.mapButtons[(coord:=x)].setDisabled(True)
-        elif x == -1:
+        elif x == -1:  # Column map button
             self.zoneCoord[:,y] = self.numZones + 1
             self.mapButtons[(coord:=y)].setDisabled(True)
-        else:
+        else:  # Cell map button
             self.zoneCoord[x][y] = self.numZones + 1
             self.mapButtons[x][y].setEnabled(False)
             self.mapButtons[x][y].setProperty(f'zone{self.numZones}', True)
@@ -451,7 +505,7 @@ class MainWindow(QMainWindow):
             return
         self.mapButtons[coord].setProperty(f'zone{self.numZones}', True)
         self.map.setStyleSheet(styleSheet(self.numZones))
-            
+        
     def cellMapButtons(self):        
         self.newAreaBtn('Cell')
         if not self.areaBtn['Cell'].isChecked():
@@ -493,6 +547,8 @@ class MainWindow(QMainWindow):
         halves[0].setStyleSheet(f"background-color: rgba({color[0]}, 0.3)")
         halves[1].setStyleSheet(f"background-color: rgba({color[1]}, 0.3)")
         
+        self.fillTable()
+        
     def hHalfArea(self):
         self.newAreaBtn('Horizontal_halves')
         if not self.areaBtn['Horizontal_halves'].isChecked():
@@ -512,6 +568,8 @@ class MainWindow(QMainWindow):
             self.mapLayout.addWidget(half)
         halves[0].setStyleSheet(f"background-color: rgba({color[0]}, 0.3)")
         halves[1].setStyleSheet(f"background-color: rgba({color[1]}, 0.3)")
+        
+        self.fillTable()
     
     def wallArea(self):
         self.newAreaBtn('Wall')
@@ -537,6 +595,8 @@ class MainWindow(QMainWindow):
         inner.setFixedSize(int(self.mapSide / 2), int(self.mapSide / 2))
         inner.setStyleSheet(f"background-color: rgba({color[1]}, 0.3)")
         self.mapLayout.addWidget(inner, 0, 0, alignment = Qt.AlignCenter)
+        
+        self.fillTable()
 
     def columnMapButtons(self):      
         self.newAreaBtn('Column')
@@ -611,11 +671,11 @@ class MainWindow(QMainWindow):
             self.areaBtn[name].setIcon(QIcon(pixmap))
             self.areaBtn[name].setIconSize(QSize(30, 30))
             # Button is 2px larger than icon, otherwise some icons' pxls are outside
-            self.areaBtn[name].setFixedSize(32, 32)
+            self.areaBtn[name].setFixedSize(31, 31)
             self.areaButtonLayout.addWidget(self.areaBtn[name])
             self.areaBtn[name].setCheckable(True)
 
-        self.areaButtonLayout.setSpacing(int((self.mapSide - (32 * numAreaBtn)) / \
+        self.areaButtonLayout.setSpacing(int((self.mapSide - (31 * numAreaBtn)) / \
                                          (numAreaBtn - 1)))
         self.areaButtonLayout.setContentsMargins(0, 0, 30, 0)
                 
@@ -626,11 +686,57 @@ class MainWindow(QMainWindow):
                      self.table.frameWidth() * 2
         return tableWidth
     
+    def fillTable(self):
+        try:
+            tableData = self.stat.table(self.zoneCoord, self.startSelected, 
+                                        self.endSelected, self.period, 
+                                        self.statParam)
+        except AttributeError:  # If .csv has not yet been opened
+            return
+        s = self.hasSelectedStat
+        n = self.numStatParam
+        
+        # Fill Total time statistics
+        for zone in range(self.numZones+1):
+            for k in range(n):
+                key = self.statParam[k]
+                val = round(tableData[0][zone][key], 1)
+                item = QTableWidgetItem(str(val))
+                self.table.setItem(k, zone, item)
+                
+        # Fill Selected time statistics
+        if self.hasSelectedStat:
+            for zone in range(self.numZones+1):
+                for k in range(n):
+                    key = self.statParam[k]
+                    val = round(tableData[-1][zone][key], 1)
+                    item = QTableWidgetItem(str(val))
+                    self.table.setItem(n+k, zone, item)
+              
+        # Fill Whole field and all zone/period statistics
+        for per in range(1, self.numPeriods+1):
+            for zone in range(self.numZones+1):
+                for k in range(n):
+                    key = self.statParam[k]
+                    val = round(tableData[per][zone][key], 1)
+                    item = QTableWidgetItem(str(val))
+                    self.table.setItem(n*(per+s) + k, zone, item)
+                                  
+    def saveData(self):
+        self.outputFile = QFileDialog.getSaveFileName(self, 'Save statistics', 
+                          os.path.splitext(self.inputFile)[0]+'_statistics.csv')
+        with open(self.outputFile, 'w+') as output:
+            writer = csv.writer(output)
+            writer.writerow([''] + [f'Zone {x+1}' for x in range(self.numZones)])
+            for per in range(self.numPeriods+2):
+                for key in range(4):
+                    pass
+        
 class Delegate(QStyledItemDelegate):
     
     def paint(self, painter, option, index):
         super().paint(painter, option, index) 
-        if (index.row() // 4) % 2 == 1:
+        if (index.row() // window.numStatParam) % 2 == 1:
             painter.fillRect(option.rect, QColor(200, 200, 200, 120))  
         if index.column() == 1:
             # painter.fillRect(option.rect, Delegate.columnColor[0])
