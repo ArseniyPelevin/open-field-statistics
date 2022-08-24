@@ -121,7 +121,6 @@ class MainWindow(QMainWindow):
 
 
         self.table.setItemDelegate(Delegate(self.table))
-
         self.table.setVerticalHeaderLabels(['Total time, s', 'Total distance, cm', 
                                             'Total velocity, cm/s', 'Total rearings'])
         self.table.setHorizontalHeaderLabels(['Whole field'])
@@ -157,7 +156,7 @@ class MainWindow(QMainWindow):
         # self.table.verticalHeaderItem(3).setBackground(QColor(200, 200, 200, 100))
         # self.table.setVerticalHeaderItem(3, header)
         
-        self.table.show()
+        # self.table.show()
         self.table.setFixedWidth(self.tableWidth())
         self.adjustSize()
     
@@ -263,33 +262,20 @@ class MainWindow(QMainWindow):
         iStart = self.stat.timePoint(self.df, start)
         iEnd = self.stat.timePoint(self.df, end)
         
-        if not self.hasSelectedStat:
+        if start == 0 and end == self.stat.totalTime:
+            self.hasSelectedStat = False
+        elif not self.hasSelectedStat:
             headers = ['Selected time, s', 'Selected distance, cm', 
                        'Selected velocity, cm/s', 'Selected rearings']
             headers = list(map(QTableWidgetItem, headers))
             for i in range(n):
                 self.table.insertRow(i+n)
                 self.table.setVerticalHeaderItem(i+n, headers[i])
-        self.hasSelectedStat = True
-        
-        # item = QTableWidgetItem(f'{start}-{end}')
-        # self.table.setItem(n, 0, item)
-        
-        # selectedDistance = self.stat.calcDistance(self.df, iStart, iEnd)
-        # item = QTableWidgetItem(str(selectedDistance))
-        # self.table.setItem(n+1, 0, item)   
-        
-        # selectedVelocity = self.stat.calcVelocity(start, end, selectedDistance)
-        # item = QTableWidgetItem(str(selectedVelocity))
-        # self.table.setItem(n+2, 0, item)        
-        
-        # selectedRearings = self.stat.calcRearings(self.df, iStart, iEnd)
-        # item = QTableWidgetItem(str(selectedRearings))
-        # self.table.setItem(n+3, 0, item)
+            self.hasSelectedStat = True
         
         self.startSelected = start
         self.endSelected = end
-        self.fillTable()
+        self.updatePeriod()
         
         self.drawPath(iStart, iEnd)
         
@@ -316,8 +302,10 @@ class MainWindow(QMainWindow):
         except ValueError:  # Empty line
             self.period = 0
         selectedInterval = round(self.endSelected-self.startSelected, 1)
-        if self.period == 0 or self.period == selectedInterval:
+        if self.period == 0 or self.period >= selectedInterval:
             self.period = selectedInterval  # default value
+            self.periodLine.setText(str(60 / self.period)) 
+                                        # Period is shown in minutes
             self.numPeriods = 0
             self.fillTable()
             return
@@ -326,8 +314,8 @@ class MainWindow(QMainWindow):
         for i in range(self.numPeriods):
             timeStart = round(i * self.period, 1)
             timeEnd = round((i+1) * self.period, 1)
-            if timeEnd > self.stat.totalTime:
-                timeEnd = self.stat.totalTime
+            if timeEnd > self.endSelected:
+                timeEnd = self.endSelected
             numRows = self.table.rowCount()
             self.table.setRowCount(numRows+n)
             self.table.setVerticalHeaderItem(numRows, 
@@ -347,6 +335,7 @@ class MainWindow(QMainWindow):
     def sliderUpdateTimeRange(self):
         start, end = [x/10 for x in self.timeRangeSlider.value()]
         
+        # Update values in text editors based on slider
         self.startTime.setText(str(start))
         self.endTime.setText(str(end))
 
@@ -356,6 +345,7 @@ class MainWindow(QMainWindow):
         start = float(self.startTime.text())
         end = float(self.endTime.text())
         
+        # Update slider values based on text editors
         self.timeRangeSlider.setValue([start*10, end*10])
         
         self.selectedStat(start, end)   
@@ -383,11 +373,16 @@ class MainWindow(QMainWindow):
         
         # start >= end
         if not float(self.startTime.text()) < float(self.endTime.text()):
-                lineEdit.backspace()
-                return
+            lineEdit.backspace()
+            return
         
     def updateMap(self):
         start, end = [x/10 for x in self.timeRangeSlider.value()]
+        
+        # Update values in text editors based on slider
+        self.startTime.setText(str(start))
+        self.endTime.setText(str(end))
+        
         iStart = self.stat.timePoint(self.df, start)
         iEnd = self.stat.timePoint(self.df, end)
         self.drawPath(iStart, iEnd)
@@ -712,21 +707,11 @@ class MainWindow(QMainWindow):
         return tableHeight
         
     def fillTable(self):
-        # self.table.show()
-        
-        self.table.setFixedWidth(width := self.tableWidth())
-        print('width: ', width)
-        # self.table.setFixedHeight(self.tableHeight())      
-
-
-        # if (height := self.tableHeight()) < self.sizeHint().height():
-        #     self.table.setFixedHeight(height)
-        # else: 
-        #     self.table.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
-        #     self.table.adjustSize()
+        # Adjust table width to contents
+        self.table.setFixedWidth(self.tableWidth())
+        # Adjust window width to table
         app.processEvents()
         self.adjustSize()
-        # self.setFixedHeight(self.sizeHint().height())
         
         try:
             tableData = self.stat.table(self.zoneCoord, self.startSelected, 
@@ -734,6 +719,7 @@ class MainWindow(QMainWindow):
                                         self.statParam)
         except AttributeError:  # If .csv has not yet been opened
             return
+        
         s = self.hasSelectedStat
         n = self.numStatParam
         
@@ -754,7 +740,7 @@ class MainWindow(QMainWindow):
                     item = QTableWidgetItem(str(val))
                     self.table.setItem(n+k, zone, item)
               
-        # Fill Whole field and all zone/period statistics
+        # Fill (Whole field and all zone)/period statistics
         for per in range(1, self.numPeriods+1):
             for zone in range(self.numZones+1):
                 for k in range(n):
