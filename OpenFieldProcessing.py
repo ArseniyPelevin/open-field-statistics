@@ -304,7 +304,8 @@ class MainWindow(QMainWindow):
         selectedInterval = round(self.endSelected-self.startSelected, 1)
         if self.period == 0 or self.period >= selectedInterval:
             self.period = selectedInterval  # default value
-            self.periodLine.setText(str(60 / self.period)) 
+            print('period: ', self.period)
+            self.periodLine.setText(str(round(self.period / 60, 1)))
                                         # Period is shown in minutes
             self.numPeriods = 0
             self.fillTable()
