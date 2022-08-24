@@ -26,8 +26,11 @@ import re
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("OpenField processing")
+        self.setWindowTitle("OpenField Statistics")
         self.setWindowIcon(QIcon('logo.png'))
+        
+        # screen = app.primaryScreen().size()
+        # self.setMaximumSize(screen)
         self.setGeometry(100, 100, 100, 100)
         
         self.setVariables()
@@ -40,6 +43,8 @@ class MainWindow(QMainWindow):
                       'boxSide': 40, 'numStatParam': 4}
         self.numLasers = 16
         self.mapSide = 320 # px
+        # self.mapSide = 608
+        #self.mapSide = min(self.height(), self.width()/2) * 2/3
         self.numStatParam = 4  # Time, distance, velocity, rearings
         self.statParam = ['time', 'dist', 'vel', 'rear']
 
@@ -48,6 +53,20 @@ class MainWindow(QMainWindow):
         self.numZones = 0
         
         self.hasSelectedStat = False
+    
+    # def resizeEvent(self, e):
+    #     # try:
+    #         availableHeight = self.height() \
+    #             - sum([self.controlLayout.rowMinimumHeight(row) 
+    #                    for row in [0, 1, 4, 5]])
+    #         print(self.controlLayout.rowMinimumHeight(5))
+    #         availableWidth = 600 #self.width() - (self.tableWidth()
+    #                                         # + self.controlLayout.columnMinimumWidth(0))
+    #         self.mapSide = (s := min(availableHeight, availableWidth)) \
+    #                        - (s % self.numLasers)
+    #         self.drawMap()
+        # except AttributeError:
+        #     raise 
     
     def setWidgets(self):
         self.getFileButton = QPushButton("Select file")
@@ -79,10 +98,13 @@ class MainWindow(QMainWindow):
         
         self.areaButtons()
         self.map = QLabel()
+        # self.map.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.drawMap()
         self.setTable()
         
     def setTable(self):
+        # self.tableLabel = QLabel()
+        # self.table = QTableWidget(self.numStatParam, 1, self.tableLabel)
         self.table = QTableWidget(self.numStatParam, 1)
         
         # Forbid user touch anything in the table
@@ -92,7 +114,9 @@ class MainWindow(QMainWindow):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
         
-        self.table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        # self.table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        # self.table.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.MinimumExpanding)
+        # self.table.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
 
@@ -175,27 +199,38 @@ class MainWindow(QMainWindow):
         periodLayout.addWidget(self.periodLine, alignment = Qt.AlignRight)
         periodLayout.addWidget(self.mins, alignment = Qt.AlignRight)
         
-        controlLayout = QGridLayout()
-        controlLayout.addWidget(self.getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
-        controlLayout.addWidget(self.fileName, 1, 0, 1, 2, Qt.AlignTop)
-        controlLayout.addWidget(self.addZoneBtn, 2, 0, 1, 2, Qt.AlignRight)
-        controlLayout.addLayout(self.areaButtonLayout, 3, 0, 1, 1, Qt.AlignLeft)
-        controlLayout.addWidget(self.map, 3, 1, 1, 1, Qt.AlignHCenter)
-        controlLayout.addLayout(periodLayout, 4, 0, 1, 2, Qt.AlignRight)
-        controlLayout.addLayout(timeRangeLayout, 5, 0, 1, 2, Qt.AlignBottom)
+        self.controlLayout = QGridLayout()
+        self.controlLayout.addWidget(self.getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
+        self.controlLayout.addWidget(self.fileName, 0, 1, 1, 2, Qt.AlignTop)
+        self.controlLayout.addWidget(self.addZoneBtn, 1, 0, 1, 2, Qt.AlignRight)
+        self.controlLayout.addLayout(self.areaButtonLayout, 2, 0, 1, 1, Qt.AlignLeft)
+        self.controlLayout.addWidget(self.map, 2, 1, 1, 1, Qt.AlignLeft)
+        self.controlLayout.addLayout(periodLayout, 4, 0, 1, 2,
+                                     (Qt.AlignRight | Qt.AlignBottom))
+        self.controlLayout.addLayout(timeRangeLayout, 5, 0, 1, 2, Qt.AlignBottom)
         
-        dataLayout = QVBoxLayout()
-        dataLayout.addWidget(self.table)
-        dataLayout.addWidget(self.saveButton)
+        self.controlLayout.addItem(QSpacerItem(0, 0), 0, 2, 5, 1)
+        self.controlLayout.setColumnStretch(3, 1)
+        self.controlLayout.addItem(QSpacerItem(0, 0), 3, 0, 1, 2)
+        self.controlLayout.setRowStretch(3, 1)
         
-        generalLayout = QHBoxLayout()
-        generalLayout.addLayout(controlLayout)
-        generalLayout.addLayout(dataLayout)
-        # generalLayout.addWidget(self.table, Qt.AlignCenter)
-        # generalLayout.setSizeConstraint(QLayout.SetMinimumSize)
+        self.dataLayout = QVBoxLayout()
+        self.dataLayout.addWidget(self.table)
+        self.dataLayout.addWidget(self.saveButton,
+                                   alignment=(Qt.AlignmentFlag.AlignRight 
+                                              | Qt.AlignmentFlag.AlignBottom))
+        # self.dataLayout.setSizeConstraint(QLayout.SetMaximumSize)
+        
+        self.generalLayout = QHBoxLayout()
+        self.generalLayout.addLayout(self.controlLayout)
+        self.generalLayout.addLayout(self.dataLayout)
+        
+        # self.layout().setSizeConstraint(QLayout.SetFixedSize)
+        # self.generalLayout.addWidget(self.table, Qt.AlignCenter)
+        # self.generalLayout.setSizeConstraint(QLayout.SetMinimumSize)
                 
         container = QWidget()
-        container.setLayout(generalLayout)
+        container.setLayout(self.generalLayout)
         
         self.setCentralWidget(container)
         
@@ -210,7 +245,6 @@ class MainWindow(QMainWindow):
         self.df = pd.read_csv(file, delimiter=";")
         self.stat = OFStatistics(self.df, self.param) 
         # self.stat = OFStatistics(file)
-        self.totalStat()
         self.setTimeRange()
         self.drawPath(0, self.df.index[-1])
         
@@ -222,17 +256,6 @@ class MainWindow(QMainWindow):
         
         self.fillTable()
         self.saveButton.setEnabled(True)
-        
-    def totalStat(self):
-        pass
-        # item = QTableWidgetItem(str(self.stat.totalTime))
-        # self.table.setItem(0, 0, item)
-        # item = QTableWidgetItem(str(self.stat.totalDistance))
-        # self.table.setItem(1, 0, item)
-        # item = QTableWidgetItem(str(self.stat.totalVelocity))
-        # self.table.setItem(2, 0, item)
-        # item = QTableWidgetItem(str(self.stat.totalRearings))
-        # self.table.setItem(3, 0, item)
         
     def selectedStat(self, start, end):
         n = self.numStatParam
@@ -295,6 +318,7 @@ class MainWindow(QMainWindow):
         selectedInterval = round(self.endSelected-self.startSelected, 1)
         if self.period == 0 or self.period == selectedInterval:
             self.period = selectedInterval  # default value
+            self.numPeriods = 0
             self.fillTable()
             return
         
@@ -343,7 +367,7 @@ class MainWindow(QMainWindow):
             lineEdit.backspace()
             return 
         
-        # period is in minutes, not seconds
+        # period is in minutes, selected time interval is in seconds
         num = 60*float(lineEdit.text()) if period else float(lineEdit.text())
         
         # Out of total time range
@@ -357,7 +381,7 @@ class MainWindow(QMainWindow):
             lineEdit.backspace()
             return
         
-        # start > end
+        # start >= end
         if not float(self.startTime.text()) < float(self.endTime.text()):
                 lineEdit.backspace()
                 return
@@ -414,8 +438,8 @@ class MainWindow(QMainWindow):
             self.zoneCoord = np.zeros((self.numLasers, self.numLasers))
             if newBtn not in multiZone:
             # There will be only 2 zones
-                self.addNewZone(fillTable=False)
-                self.addNewZone(fillTable=False)
+                self.addNewZone(fillTable=False, numNewZones=2)
+                # self.addNewZone(fillTable=False)
                 # Will fill table from specific area function,
                 # after updating zoneCoord
             [self.areaBtn[key].setDisabled(True) for key in self.areaBtnNames \
@@ -449,18 +473,22 @@ class MainWindow(QMainWindow):
         self.map.setStyleSheet(styleSheet(self.numZones))
             
     @pyqtSlot()    
-    def addNewZone(self, fillTable=True):
-        if self.numZones == 4:                 # Maximum 4 zones
-            return
-        self.numZones += 1
-        
-        # Add new table column
-        header = QTableWidgetItem(f'Zone {self.numZones}')
-        num = self.table.columnCount()
-        self.table.setColumnCount(num+1)
-        self.table.setHorizontalHeaderItem(num, header)
-        self.table.setFixedWidth(self.tableWidth())
-        self.map.setStyleSheet(styleSheet(self.numZones))
+    def addNewZone(self, fillTable=True, numNewZones=1):
+
+        for i in range(numNewZones):
+            if self.numZones == 4:                 # Maximum 4 zones
+                return
+            self.numZones += 1
+            
+            # Add new table column
+            header = QTableWidgetItem(f'Zone {self.numZones}')
+            num = self.table.columnCount()
+            self.table.setColumnCount(num+1)
+            self.table.setHorizontalHeaderItem(num, header)
+            self.table.setFixedWidth(self.tableWidth())
+            # app.processEvents()
+            # self.adjustSize()
+            self.map.setStyleSheet(styleSheet(self.numZones))
         
         self.addZoneBtn.setDisabled(True)
         # We should't be able to add empty zone before we selected some new area
@@ -658,23 +686,48 @@ class MainWindow(QMainWindow):
 
             self.areaBtn[name].setIcon(QIcon(pixmap))
             self.areaBtn[name].setIconSize(QSize(30, 30))
-            # Button is 2px larger than icon, otherwise some icons' pxls are outside
-            self.areaBtn[name].setFixedSize(31, 31)
+            self.areaBtn[name].setFixedSize(30, 30)
             self.areaButtonLayout.addWidget(self.areaBtn[name])
             self.areaBtn[name].setCheckable(True)
 
-        self.areaButtonLayout.setSpacing(int((self.mapSide - (31 * numAreaBtn)) / \
+        self.areaButtonLayout.setSpacing(int((self.mapSide - (30 * numAreaBtn)) / 
                                          (numAreaBtn - 1)))
-        self.areaButtonLayout.setContentsMargins(0, 0, 30, 0)
-                
+        # self.areaButtonLayout.setContentsMargins(0, 0, 30, 0)
+                 
     def tableWidth(self):
+        app.processEvents()
+        app.processEvents()
         tableWidth = self.table.verticalHeader().width() + \
                      self.table.horizontalHeader().length() + \
-                     self.table.verticalScrollBar().width() + \
                      self.table.frameWidth() * 2
+        if (s := self.table.verticalScrollBar().isVisible()):
+            tableWidth += self.table.verticalScrollBar().width()
+
         return tableWidth
     
+    def tableHeight(self):
+        tableHeight = self.table.verticalHeader().length() + \
+                      self.table.horizontalHeader().height() + \
+                      self.table.frameWidth() * 2
+        return tableHeight
+        
     def fillTable(self):
+        # self.table.show()
+        
+        self.table.setFixedWidth(width := self.tableWidth())
+        print('width: ', width)
+        # self.table.setFixedHeight(self.tableHeight())      
+
+
+        # if (height := self.tableHeight()) < self.sizeHint().height():
+        #     self.table.setFixedHeight(height)
+        # else: 
+        #     self.table.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
+        #     self.table.adjustSize()
+        app.processEvents()
+        self.adjustSize()
+        # self.setFixedHeight(self.sizeHint().height())
+        
         try:
             tableData = self.stat.table(self.zoneCoord, self.startSelected, 
                                         self.endSelected, self.period, 
@@ -709,7 +762,7 @@ class MainWindow(QMainWindow):
                     val = round(tableData[per][zone][key], 1)
                     item = QTableWidgetItem(str(val))
                     self.table.setItem(n*(per+s) + k, zone, item)
-                                  
+                                          
     def saveData(self):
         self.outputFile = QFileDialog.getSaveFileName(self, 'Save statistics', 
                           os.path.splitext(self.inputFile)[0]+'_statistics.csv')
@@ -724,7 +777,7 @@ class Delegate(QStyledItemDelegate):
     
     def paint(self, painter, option, index):
         super().paint(painter, option, index) 
-        if (index.row() // window.numStatParam) % 2 == 1:
+        if (index.row() // mywindow.numStatParam) % 2 == 1:
             painter.fillRect(option.rect, QColor(200, 200, 200, 120))  
         if index.column() == 1:
             # painter.fillRect(option.rect, Delegate.columnColor[0])
@@ -739,6 +792,6 @@ class Delegate(QStyledItemDelegate):
             
 app = QApplication(os.sys.argv)
 app.setStyle(QStyleFactory.create('Fusion'))
-window = MainWindow()
-window.show()
+mywindow = MainWindow()
+mywindow.show()
 app.exec()
