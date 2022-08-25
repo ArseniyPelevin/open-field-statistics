@@ -39,7 +39,7 @@ class MainWindow(QMainWindow):
         self.setLayouts()
         
     def setVariables(self):
-        self.param = {'numLasers': 16, 'mapSide': 320, 
+        self.params = {'numLasers': 16, 'mapSide': 320, 
                       'boxSide': 40, 'numStatParam': 4}
         self.numLasers = 16
         self.mapSide = 320 # px
@@ -207,6 +207,7 @@ class MainWindow(QMainWindow):
                                      (Qt.AlignRight | Qt.AlignBottom))
         self.controlLayout.addLayout(timeRangeLayout, 5, 0, 1, 2, Qt.AlignBottom)
         
+        # Add spacers
         self.controlLayout.addItem(QSpacerItem(0, 0), 0, 2, 5, 1)
         self.controlLayout.setColumnStretch(3, 1)
         self.controlLayout.addItem(QSpacerItem(0, 0), 3, 0, 1, 2)
@@ -217,19 +218,13 @@ class MainWindow(QMainWindow):
         self.dataLayout.addWidget(self.saveButton,
                                    alignment=(Qt.AlignmentFlag.AlignRight 
                                               | Qt.AlignmentFlag.AlignBottom))
-        # self.dataLayout.setSizeConstraint(QLayout.SetMaximumSize)
         
         self.generalLayout = QHBoxLayout()
         self.generalLayout.addLayout(self.controlLayout)
         self.generalLayout.addLayout(self.dataLayout)
-        
-        # self.layout().setSizeConstraint(QLayout.SetFixedSize)
-        # self.generalLayout.addWidget(self.table, Qt.AlignCenter)
-        # self.generalLayout.setSizeConstraint(QLayout.SetMinimumSize)
                 
         container = QWidget()
         container.setLayout(self.generalLayout)
-        
         self.setCentralWidget(container)
         
     def getFile(self):
@@ -239,27 +234,27 @@ class MainWindow(QMainWindow):
         #                      'CSV files (*.csv)')
         file = r"C:\OpenField\Data1.csv"
         self.inputFile = file
-        self.fileName.setText(file)           
-        self.df = pd.read_csv(file, delimiter=";")
-        self.stat = OFStatistics(self.df, self.param) 
-        # self.stat = OFStatistics(file)
-        self.setTimeRange()
-        self.drawPath(0, self.df.index[-1])
+        self.csv_df = pd.read_csv(file, delimiter=";")
+        self.stat = OFStatistics(self.csv_df, self.params) 
         
-        # OFStatistics.table() default values
+        # Update variables
         self.startSelected = 0
         self.endSelected = self.stat.totalTime
         self.period = self.stat.totalTime
         self.numPeriods = 1
         
+        # Update window
+        self.fileName.setText(file)  
+        self.setTimeRange()
+        self.drawPath(0, self.stat.data.index[-1])
         self.fillTable()
         self.saveButton.setEnabled(True)
         
     def selectedStat(self, start, end):
         n = self.numStatParam
         
-        iStart = self.stat.timePoint(self.df, start)
-        iEnd = self.stat.timePoint(self.df, end)
+        iStart = self.stat.timeIndex(start)
+        iEnd = self.stat.timeIndex(end)
         
         if start == 0 and end == self.stat.totalTime:
             self.hasSelectedStat = False
@@ -382,8 +377,8 @@ class MainWindow(QMainWindow):
         self.startTime.setText(str(start))
         self.endTime.setText(str(end))
         
-        iStart = self.stat.timePoint(self.df, start)
-        iEnd = self.stat.timePoint(self.df, end)
+        iStart = self.stat.timeIndex(start)
+        iEnd = self.stat.timeIndex(end)
         self.drawPath(iStart, iEnd)
                 
     def drawMap(self):
@@ -407,14 +402,14 @@ class MainWindow(QMainWindow):
         painter = QPainter(canvas)
         painter.setPen(QPen(Qt.red, 2))
         lastX, lastY = 0, 0
-        for i, row in self.df.iloc[iStart:iEnd, :].iterrows():
-            if row['X'] != 0 and row['Y'] != 0:
+        for i, row in self.stat.data.iloc[iStart:iEnd, :].iterrows():
+            if row['x'] != 0 and row['y'] != 0:
                 if not lastX:
-                    lastX = int(row['X'] * cell - cell / 2)
-                    lastY = int(row['Y'] * cell - cell / 2)
+                    lastX = int(row['x'] * cell - cell / 2)
+                    lastY = int(row['y'] * cell - cell / 2)
                     continue
-                x = int(row['X'] * cell - cell / 2)
-                y = int(row['Y'] * cell - cell / 2)
+                x = int(row['x'] * cell - cell / 2)
+                y = int(row['y'] * cell - cell / 2)
                 painter.drawLine(lastX, lastY, x, y)
                 lastX = x
                 lastY = y
@@ -782,8 +777,6 @@ class Delegate(QStyledItemDelegate):
                                     index.data(Qt.BackgroundColorRole))
         except UnboundLocalError:  # A white cell, no color was set
             pass
-
-      #  QStyledItemDelegate.paint(self, painter, option, index)
         
     def overlap(self, bg, fg):
         bga = bg[3] / 255

@@ -1,29 +1,27 @@
 from datetime import datetime, timedelta
-
-from math import dist, ceil, floor
-import pandas as pd
+from math import dist, ceil
 from statistics import fmean
-import sys
+
+import pandas as pd
 
 class OFStatistics():
-    def __init__(self, df, param):       
-        df.columns.values[0] = "Time" 
-        self.data = self.getData(df, param)
-        self.totalTime = self.calcTotalTime(df)
-        self.totalDistance = self.calcTotalDistance(df)
-        self.totalVelocity = self.calcVelocity(0, self.totalTime, self.totalDistance)
-        self.totalRearings = self.calcRearings(df, 0, df.index[-1])
+    def __init__(self, csv_df, param):       
+        csv_df.columns.values[0] = "Time" 
+        self.data = self.getData(csv_df, param)
         self.totalTime = round(self.data.at[self.data.index[-1], 'time'], 1)
         self.totalDistance = round(self.totalDistance, 1)
         self.totalVelocity = round(self.totalDistance / self.totalTime, 1)
-        print(f'Total time: {self.totalTime}\nTotal distance: {self.totalDistance}\nTotal Velocity: {self.totalVelocity}\nTotal rearings: {self.totalRearings}')
+        print(f'Total time: {self.totalTime}\n',
+              f'Total distance: {self.totalDistance}\n',
+              f'Total Velocity: {self.totalVelocity}\n',
+              f'Total rearings: {self.totalRearings}', sep='')
        
-    def getData(self, df, param):
+    def getData(self, csv_df, params):
         data = []
         self.totalDistance = 0
         self.totalRearings = 0
         j = 0  # data[] indexing
-        for i, row in df.iterrows():
+        for i, row in csv_df.iterrows():
             # Time points when animal wasn't in the box or when only one
             # coordinate was detected won't be recorded and further processed
             if row['X1'] == 0 or row['Y1'] == 0:
@@ -33,33 +31,36 @@ class OFStatistics():
             x = fmean([row['X1'], row['X2']])
             y = fmean([row['Y1'], row['Y2']])
             
-            if i == 0 or j == 0:
-                # Time of first animal detection
-                timeStart = datetime.strptime(df.at[0, 'Time'][:-1], 
-                                              '%H:%M:%S.%f')
+            if j == 0:  # Animal is detected and recorded for the first time
+                # Time of the first animal detection
+                timeStart = datetime.strptime(row['Time'][:-1], '%H:%M:%S.%f')
+                            # Input file has 7 decimals in time instead of 6
                 time = 0
                 #  For not to mix types 'numpy.bool_' and 'bool'
-                z = True if df.at[i, 'Z'] else False
+                z = True if row['Z'] else False
                 d = 0
             else:
                 # Current time in input .csv file
                 time = datetime.strptime(row['Time'][:-1], '%H:%M:%S.%f')
+                       # Input file has 7 decimals in time instead of 6
                 # Seconds since start of recording (first animal appearance)
                 time = timedelta.total_seconds(time - timeStart)
                 
-                z = row['Z'] and not df.at[i-1, 'Z']  # Rearing began here
-                if z:
-                    self.totalRearings += 1
+                z = row['Z'] and not csv_df.at[i-1, 'Z']  # Rearing began here
                     
                 p = [data[j-1]['x'], data[j-1]['y']]  # Previous point
                 q = [x, y]  # Current point
-                d = dist(p, q) * (param['boxSide'] / param['numLasers'])
+                d = dist(p, q) * (params['boxSide'] / params['numLasers'])
                 self.totalDistance += d
             data.append({'time': time, 'x': x, 'y': y, 'z': z, 'dist': d})
             j += 1
+            if z:
+                # Only for console verification
+                self.totalRearings += 1
         data_df = pd.DataFrame(data)
         return data_df
     
+    # Called from main to fill current table with data from self.data
     def table(self, zoneMap, start, end, period, statParam):
         # Default arguments (cannot use instance attributes in method definition)
         # if not start: start = 0
@@ -91,13 +92,13 @@ class OFStatistics():
             
             
             # Get statistics of this row
-            curTime = self.data.at[i, 'time']
+            curTime = row['time']
             time = 0
             d = 0
             rear = 0
             
             # Half the time and dist since previous time point was in this cell
-            d = self.data.at[i, 'dist'] / 2
+            d = row['dist'] / 2
             if i != 0:
                 time += (curTime - self.data.at[i-1, 'time']) / 2
                 
@@ -152,86 +153,13 @@ class OFStatistics():
 
         return tableData
        
-    def timePoint(self, df, time):
-        tp = self.timeStart + timedelta(seconds=time)
-        
-        # find closest existing time point
-        for i, row in df.iterrows():
-            curTime = datetime.strptime(df.at[i, 'Time'][:-1], '%H:%M:%S.%f')
-            if curTime > tp:
-                tp = i - 1
+    def timeIndex(self, time):        
+        # Find row index of time <= desired time
+        for i, row in self.data.iterrows():
+            if row['time'] > time:
+                ti = i - 1
                 break
-            elif i == df.index[-1]:
-                tp = i
-                # Find row index prior to desired time
-                
-        # print(f'Timepoint of {time} = {tp}')
-        return tp
+            elif i == self.data.index[-1]:
+                ti = i
 
-    def calcTotalTime(self, df):
-        self.timeStart = df.at[0, 'Time'][:-1]      
-        # [:-1] because original time has 7 decimals instead of 6
-        self.timeStart = datetime.strptime(self.timeStart, '%H:%M:%S.%f')
-        timeEnd = df.at[df.index[-1], 'Time'][:-1]
-        timeEnd = datetime.strptime(timeEnd, '%H:%M:%S.%f')
-        totalTime = round(timedelta.total_seconds(timeEnd-self.timeStart), 1)
-        # print(f"Total time: {totalTime} s")
-        return totalTime
-        
-    # distance in cell units yet
-    def calcTotalDistance(self, df):
-        df['X'] = 0
-        df['Y'] = 0
-        df['dist'] = 0
-        totalDistance = 0
-        for i, row in df.iterrows():
-            
-            # calculate central point of animal
-            df.at[i, 'X'] = fmean([row['X1'], row['X2']])
-            df.at[i, 'Y'] = fmean([row['Y1'], row['Y2']])
-            
-            if i == 0: continue
-            p = [df.at[i-1, 'X'], df.at[i-1, 'Y']]  # previous point
-            q = [df.at[i, 'X'], df.at[i, 'Y']]  # current point
-            distance = dist(p, q) * (40 / 16)
-            # 40 cm - edge of OpenField box, 16 - number of cells
-            df.at[i, 'dist'] = distance  # dist since last point
-            totalDistance += distance
-        totalDistance = round(totalDistance, 1)
-                
-        # print(f'Total distance: {totalDistance} cm')
-        return totalDistance
-    
-    def calcDistance(self, df, iStart, iEnd):
-        # row1 = self.timePoint(df, start)
-        # row2 = self.timePoint(df, end)
-        row1 = iStart
-        row2 = iEnd
-        distance = 0
-        for i, row in df.iloc[row1:row2+1, :].iterrows():
-            distance += row['dist']
-        distance = round(distance, 1)
-        # print(f"Selected distance: {distance} cm")
-        return distance
-    
-    def calcVelocity(self, start, end, dist):
-        velocity = dist / (end - start)
-        velocity = round(velocity, 1)
-        print(f"Velocity: {velocity} cm/s")
-        return velocity
-        
-    def calcRearings(self, df, iStart, iEnd):
-        # row1 = self.timePoint(df, start)
-        # row2 = self.timePoint(df, end)
-        row1 = iStart
-        row2 = iEnd
-        wasRearing = False
-        rearings = 0
-        for i, row in df.iloc[row1:row2+1, :].iterrows():
-            if row['Z'] and not wasRearing:
-                rearings += 1
-                wasRearing = True
-            elif not row['Z'] and wasRearing:
-                wasRearing = False
-        # print(f'Rearings: {rearings}')
-        return rearings
+        return ti
