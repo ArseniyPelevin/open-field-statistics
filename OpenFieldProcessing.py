@@ -119,7 +119,6 @@ class MainWindow(QMainWindow):
         # self.table.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-
         self.table.setItemDelegate(Delegate(self.table))
         self.table.setVerticalHeaderLabels(['Total time, s', 'Total distance, cm', 
                                             'Total velocity, cm/s', 'Total rearings'])
@@ -304,7 +303,6 @@ class MainWindow(QMainWindow):
         selectedInterval = round(self.endSelected-self.startSelected, 1)
         if self.period == 0 or self.period >= selectedInterval:
             self.period = selectedInterval  # default value
-            print('period: ', self.period)
             self.periodLine.setText(str(round(self.period / 60, 1)))
                                         # Period is shown in minutes
             self.numPeriods = 0
@@ -764,17 +762,37 @@ class Delegate(QStyledItemDelegate):
     
     def paint(self, painter, option, index):
         super().paint(painter, option, index) 
-        if (index.row() // mywindow.numStatParam) % 2 == 1:
-            painter.fillRect(option.rect, QColor(200, 200, 200, 120))  
-        if index.column() == 1:
-            # painter.fillRect(option.rect, Delegate.columnColor[0])
-            painter.fillRect(option.rect, QColor(*zoneColors[0], 80))
-        if index.column() == 2:
-            painter.fillRect(option.rect, QColor(*zoneColors[1], 80))
-        if index.column() == 3:
-            painter.fillRect(option.rect, QColor(*zoneColors[2], 80))
-        if index.column() == 4:
-            painter.fillRect(option.rect, QColor(*zoneColors[3], 80))
+        
+        # Colored zone and grey even block
+        if index.column() != 0 and \
+           (index.row() // mywindow.numStatParam) % 2 == 1:
+            color = self.overlap(np.array([120, 120, 120, 120]),
+                            np.array([*zoneColors[index.column()-1], 80]))
+        # Colored zone
+        elif index.column() != 0:
+            color = (*zoneColors[index.column()-1], 80)
+        # Grey even block
+        elif (index.row() // mywindow.numStatParam) % 2 == 1:
+                color = (200, 200, 200, 120)
+            
+        try:
+            index.model().setData(index, QColor(*color), 
+                                  Qt.BackgroundColorRole)
+            option.palette.setColor(QPalette.Base, 
+                                    index.data(Qt.BackgroundColorRole))
+        except UnboundLocalError:  # A white cell, no color was set
+            pass
+
+      #  QStyledItemDelegate.paint(self, painter, option, index)
+        
+    def overlap(self, bg, fg):
+        bga = bg[3] / 255
+        fga = fg[3] / 255
+        bg = bg[:3] / 255
+        fg = fg[:3] / 255
+        a = 1 - (1 - bga) * (1 - fga)
+        color = fg * fga / a + bg * bga * (1 - fga) / a
+        return map(int, [*(color * 255), a * 255])
     
             
 app = QApplication(os.sys.argv)
