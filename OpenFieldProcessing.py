@@ -86,7 +86,7 @@ class MainWindow(QMainWindow):
         self.periodLine = QLineEdit(alignment = Qt.AlignRight)
         self.periodLine.setFixedWidth(60)
         self.periodLine.setDisabled(True)
-        self.mins = QLabel(" min")
+        self.mins = QLabel(" seconds")
         
         self.addZoneBtn = QPushButton('Add zone')
         self.addZoneBtn.setFixedWidth(80)
@@ -173,13 +173,14 @@ class MainWindow(QMainWindow):
         self.areaBtn['Square'].toggled.connect(self.squareMapButtons)
         
         # Check if input is correct
-        self.periodLine.textEdited.connect(lambda: self.checkCorrect(self.periodLine, 
-                                                                 period=True))
+        self.periodLine.textEdited.connect(lambda: self.checkCorrect(self.periodLine,
+                                                                     period=True))
         self.startTime.textEdited.connect(lambda: self.checkCorrect(self.startTime))
         self.endTime.textEdited.connect(lambda: self.checkCorrect(self.endTime))
         
         # Update time range from text
-        self.periodLine.editingFinished.connect(self.updatePeriod)
+        self.periodLine.editingFinished.connect(lambda: 
+                                        self.updatePeriod(isUsersPeriod=True))
         self.startTime.editingFinished.connect(self.textUpdateTimeRange)
         self.endTime.editingFinished.connect(self.textUpdateTimeRange)
         # Update time range from slider
@@ -286,20 +287,22 @@ class MainWindow(QMainWindow):
         self.startTime.setText(str(0))
         self.endTime.setText(str(self.stat.totalTime))
         
-    def updatePeriod(self):
+    def updatePeriod(self, isUsersPeriod=False):
+        if isUsersPeriod:
+            self.isUsersPeriod = True
         n = self.numStatParam
         self.table.setRowCount(n + n * self.hasSelectedStat)
         
         try:
             self.period = float(self.periodLine.text())
-            self.period = round(self.period * 60, 1)  # User enters minutes
         except ValueError:  # Empty line
             self.period = 0
         selectedInterval = round(self.endSelected-self.startSelected, 1)
-        if self.period == 0 or self.period >= selectedInterval:
+        if self.period == 0 or self.period >= selectedInterval \
+                            or not self.isUsersPeriod:
             self.period = selectedInterval  # default value
-            self.periodLine.setText(str(round(self.period / 60, 1)))
-                                        # Period is shown in minutes
+            self.periodLine.setText('')
+            self.isUsersPeriod = False
             self.numPeriods = 0
             self.fillTable()
             return
@@ -351,8 +354,7 @@ class MainWindow(QMainWindow):
             lineEdit.backspace()
             return 
         
-        # period is in minutes, selected time interval is in seconds
-        num = 60*float(lineEdit.text()) if period else float(lineEdit.text())
+        num = float(lineEdit.text())
         
         # Out of total time range
         # No need to check for start < 0, we can't enter negative number

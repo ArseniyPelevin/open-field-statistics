@@ -58,6 +58,7 @@ class OFStatistics():
                 # Only for console verification
                 self.totalRearings += 1
         data_df = pd.DataFrame(data)
+        # print(data_df.to_string())
         return data_df
     
     # Called from main to fill current table with data from self.data
