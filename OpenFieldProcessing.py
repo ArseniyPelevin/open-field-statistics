@@ -38,25 +38,26 @@ class MainWindow(QMainWindow):
         self.setSignals()
         self.setLayouts()
         
+    # Set default variables
     def setVariables(self):
         self.params = {'numLasers': 16, 'mapSide': 320, 
-                      'boxSide': 40, 'numStatParam': 4}
+                      'boxSide': 40, 'numStatParam': 5}
         self.numLasers = 16
         self.mapSide = 320 # px
         # self.mapSide = 608
         #self.mapSide = min(self.height(), self.width()/2) * 2/3
-        self.numStatParam = 4  # Time, distance, velocity, rearings
-        self.statParam = ['time', 'dist', 'vel', 'rear']
+        self.numStatParam = 5  # Time, distance, velocity, rearings, rearings time
+        self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
 
         self.zoneCoord = np.ones((self.numLasers, self.numLasers))     
         self.numZones = 0
         
-        self.verticalHeaders = ['Time (s)', 'Distance (cm)', 
-                                'Velocity (cm/s)', 'Rearings']
-        self.headers_total = ['Total time, s', 'Total distance, cm',
-                              'Total velocity, cm/s', 'Total rearings']
-        self.headers_selected = ['Selected time, s', 'Selected distance, cm', 
-                                 'Selected velocity, cm/s', 'Selected rearings']
+        self.verticalHeaders = ['Time (s)', 'Distance (cm)', 'Velocity (cm/s)', 
+                                'Rearings number', 'Rearings time (s)']
+        # self.headers_total = ['Total time, s', 'Total distance, cm',
+        #                       'Total velocity, cm/s', 'Total rearings']
+        # self.headers_selected = ['Selected time, s', 'Selected distance, cm', 
+        #                          'Selected velocity, cm/s', 'Selected rearings']
         self.hasSelectedStat = False
     
     # def resizeEvent(self, e):
@@ -244,7 +245,7 @@ class MainWindow(QMainWindow):
         self.startSelected = 0
         self.endSelected = self.stat.totalTime
         self.period = self.stat.totalTime
-        self.numPeriods = 1
+        self.numPeriods = 0
         
         # Update window
             # Set file name label's elide mode
@@ -312,22 +313,24 @@ class MainWindow(QMainWindow):
             self.periodLine.setText('')
             self.isUsersPeriod = False
             self.numPeriods = 0
+            self.periodTimes = []
             self.fillTable()
             return
         
         self.numPeriods = m.ceil(selectedInterval / self.period)
+        self.periodTimes = []
         for i in range(self.numPeriods):
             timeStart = round(i * self.period, 1)
             timeEnd = round((i+1) * self.period, 1)
             if timeEnd > selectedInterval:
                 timeEnd = selectedInterval
+            self.periodTimes.append([timeStart, timeEnd])
             numRows = self.table.rowCount()
             self.table.setRowCount(numRows+n)
             for j in range(n):
                 self.table.setVerticalHeaderItem(numRows + j, 
                     QTableWidgetItem(f'{timeStart}-{timeEnd} s, ' 
                                      + f'{self.verticalHeaders[j]}'))
-                print(f'{self.verticalHeaders[j]}', j)
             
         self.fillTable()
         
@@ -739,34 +742,51 @@ class MainWindow(QMainWindow):
                     self.table.setItem(n+k, zone, item)
               
         # Fill (Whole field and all zone)/period statistics
-        for per in range(1, self.numPeriods+1):
-            for zone in range(self.numZones+1):
-                for k in range(n):
-                    key = self.statParam[k]
-                    val = round(self.tableData[per][zone][key], 1)
-                    item = QTableWidgetItem(str(val))
-                    self.table.setItem(n*(per+s) + k, zone, item)
+        if self.numPeriods != 0:
+            for per in range(1, self.numPeriods+1):
+                for zone in range(self.numZones+1):
+                    for k in range(n):
+                        key = self.statParam[k]
+                        val = round(self.tableData[per][zone][key], 1)
+                        item = QTableWidgetItem(str(val))
+                        self.table.setItem(n*(per+s) + k, zone, item)
                                           
     def saveData(self):
         self.outputFile, _filter = QFileDialog.getSaveFileName(self, 'Save statistics', 
-                          os.path.splitext(self.inputFileName)[0]+'_statistics.csv')
-        print(self.outputFile)
+                          os.path.splitext(self.inputFileName)[0]+'_statistics.xlsx')
         with open(self.outputFile, 'w+', newline='') as output:
-            writer = csv.writer(output)
-            # Write header
-            writer.writerow(['', 'Whole field'] 
+            writer = csv.writer(output, dialect='excel')
+            # Write horizontal header
+            writer.writerow(['', '', 'Whole field'] 
                             + [f'Zone {x+1}' for x in range(self.numZones)])
-            # Write Total time 
             
+            # Write Total time statistics
             for k in range(4):
-                    key = self.statParam[k]
-                    writer.writerow([round(self.tableData[per][zone][key], 1)
-                                     for zone in range(self.numZones+1)])
-            for per in range(1, self.numPeriods+1):
+                key = self.statParam[k]
+                writer.writerow(['Total time', f'{self.verticalHeaders[k]}']
+                                + [round(self.tableData[0][zone][key], 1)
+                                 for zone in range(self.numZones+1)])
+            # Write Selected time statistics
+            if self.hasSelectedStat:
                 for k in range(4):
-                    key = self.statParam[k]
-                    writer.writerow([round(self.tableData[per][zone][key], 1)
-                                     for zone in range(self.numZones+1)])
+                        key = self.statParam[k]
+                        writer.writerow([
+                    f'Selected time {self.startSelected}-{self.endSelected} s', 
+                    f'{self.verticalHeaders[k]}']
+                    + [round(self.tableData[-1][zone][key], 1)
+                       for zone in range(self.numZones+1)])
+                        
+            # Write periods' statistics
+            if self.numPeriods != 0:
+                for per in range(self.numPeriods):
+                    for k in range(4):
+                        key = self.statParam[k]
+                        start = self.periodTimes[per][0]
+                        end = self.periodTimes[per][1]
+                        writer.writerow([f'{start}-{end} s',
+                                         f'{self.verticalHeaders[k]}']
+                                        + [round(self.tableData[per+1][zone][key], 1)
+                                           for zone in range(self.numZones+1)])
         
 class Delegate(QStyledItemDelegate):
     

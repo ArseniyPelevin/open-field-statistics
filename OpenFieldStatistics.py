@@ -20,7 +20,7 @@ class OFStatistics():
         data = []
         self.totalDistance = 0
         self.totalRearings = 0
-        j = 0  # data[] indexing
+        j = 0  # data[] indexing, differs from csv_df indexing (see the next comment)
         for i, row in csv_df.iterrows():
             # Time points when animal wasn't in the box or when only one
             # coordinate was detected won't be recorded and further processed
@@ -31,32 +31,33 @@ class OFStatistics():
             x = fmean([row['X1'], row['X2']])
             y = fmean([row['Y1'], row['Y2']])
             
+            # Rearing
+            z = True if row['Z'] else False   # 'numpy.bool_' to 'bool'
+            
             if j == 0:  # Animal is detected and recorded for the first time
                 # Time of the first animal detection
                 timeStart = datetime.strptime(row['Time'][:-1], '%H:%M:%S.%f')
                             # Input file has 7 decimals in time instead of 6
                 time = 0
-                #  For not to mix types 'numpy.bool_' and 'bool'
-                z = True if row['Z'] else False
                 d = 0
             else:
                 # Current time in input .csv file
                 time = datetime.strptime(row['Time'][:-1], '%H:%M:%S.%f')
                        # Input file has 7 decimals in time instead of 6
+                       
                 # Seconds since start of recording (first animal appearance)
                 time = timedelta.total_seconds(time - timeStart)
-                
-                z = row['Z'] and not csv_df.at[i-1, 'Z']  # Rearing began here
-                    
+                       # timedelta.total_secinds returnds float, hence mcs accuracy
+                                    
                 p = [data[j-1]['x'], data[j-1]['y']]  # Previous point
                 q = [x, y]  # Current point
                 d = dist(p, q) * (params['boxSide'] / params['numLasers'])
                 self.totalDistance += d
             data.append({'time': time, 'x': x, 'y': y, 'z': z, 'dist': d})
             j += 1
-            if z:
-                # Only for console verification
-                self.totalRearings += 1
+            # if z:
+            #     # Only for console verification
+            #     self.totalRearings += 1
         data_df = pd.DataFrame(data)
         # print(data_df.to_string())
         return data_df
@@ -83,7 +84,7 @@ class OFStatistics():
             # zoneMap is a numpy array with [row][column] indexing,
             # while x/y are horizontal/vertical axes
             
-            # Some zones on zoneMap has values 0, which means they don't belong
+            # Some zones on zoneMap have values 0, which means they don't belong
             # to any chosen zone. Those values will be saved to tableData[][0],
             # which is reserved for whole field data. It is not a problem, as
             # it will be overwritten in the next for loop
@@ -97,19 +98,28 @@ class OFStatistics():
             time = 0
             d = 0
             rear = 0
+            rearTime = 0
+            
+            # Rearing began here
+            if i != 0:
+                rear = int(row['z'] and not self.data.at[i-1, 'z'])  
+            else:
+                rear = int(row['z'])
             
             # Half the time and dist since previous time point was in this cell
             d = row['dist'] / 2
             if i != 0:
-                time += (curTime - self.data.at[i-1, 'time']) / 2
+                time += (t := (curTime - self.data.at[i-1, 'time']) / 2)
+                if row['z']:
+                    rearTime += t
                 
             # Half the time and dist after current time point was in this cell   
             if i != len(self.data.index)-1:
-                time += (self.data.at[i+1, 'time'] - curTime) / 2
+                time += (t := (self.data.at[i+1, 'time'] - curTime) / 2)
+                if row['z']:
+                    rearTime += t
                 d += self.data.at[i+1, 'dist'] / 2
             # Assume animal doesn't disappear and reappear during observation
-            
-            rear = 1 if row['z'] else 0
                 
             
             if row['time'] >= start and row['time'] < end:  # In selected time 
@@ -118,21 +128,25 @@ class OFStatistics():
                     tableData[curPeriod][zone]['time'] += time
                     tableData[curPeriod][zone]['dist'] += d
                     tableData[curPeriod][zone]['rear'] += rear
+                    tableData[curPeriod][zone]['rearTime'] += rearTime
                 # Add statistics to period/whole field,
                 # because zones may not cover it all
                 tableData[curPeriod][0]['time'] += time
                 tableData[curPeriod][0]['dist'] += d
                 tableData[curPeriod][0]['rear'] += rear
+                tableData[curPeriod][0]['rearTime'] += rearTime
             else:  # Not in selected time, these data won't be in period/zone
                 # Add statistics to total time/zone
                 if zone != 0:  # Doesn't belong to any chosen zone
                     tableData[0][zone]['time'] += time
                     tableData[0][zone]['dist'] += d
                     tableData[0][zone]['rear'] += rear
+                    tableData[0][zone]['rearTime'] += rearTime
                 # Add statistics to total time/whole field
                 tableData[0][0]['time'] += time
                 tableData[0][0]['dist'] += d
                 tableData[0][0]['rear'] += rear
+                tableData[0][0]['rearTime'] += rearTime
                     
         # Calculate zones' total statistics
         for per in range(1, numPeriods+1):
