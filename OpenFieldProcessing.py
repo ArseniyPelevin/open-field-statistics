@@ -5,22 +5,24 @@
 #from PyQt6.QtCore import QEvent
 #from PyQt6.QtGui import QFontMetrics, QFont
 
-from PyQt6.QtWidgets import *
-from PyQt6.QtCore import *
-from PyQt6.QtGui import *
-from superqt import QRangeSlider
-
+import os
+import re
 import pandas as pd
 import numpy as np
 import math as m
 import csv
 
+from PyQt6.QtWidgets import *
+from PyQt6.QtCore import *
+from PyQt6.QtGui import *
+
+from superqt import QRangeSlider
+
 from OpenFieldStatistics import OFStatistics
 # from NewStatistics import OFStatistics
 from MapButtonStyleSheet import styleSheet, zoneColors, color
 
-import os
-import re
+
      
 
 class MainWindow(QMainWindow):
@@ -233,9 +235,9 @@ class MainWindow(QMainWindow):
         
     def getFile(self):
         self.inputFileName, _filter = QFileDialog.getOpenFileName(self, 
-                              'Open .csv file', 
-                              os.path.join('C:', 'OpenField', 'Data1.csv'), 
-                              'CSV files (*.csv)')
+                              caption='Open .csv file', 
+                              directory=r'C:\OpenField\Data1.csv', 
+                              filter='CSV files (*.csv)')
         # file = r"C:\OpenField\Data1.csv"
         # self.inputFileName = file
         self.csv_df = pd.read_csv(self.inputFileName, delimiter=";")
@@ -660,6 +662,8 @@ class MainWindow(QMainWindow):
             self.mapButtons.append(QPushButton('', self.map))
             self.mapButtons[i].setFixedSize(self.mapSide, self.mapSide)
             self.mapButtons[i].setCheckable(True)
+            
+# Add sys._MEIPASS here to package into one file
             pixmap = QPixmap(os.path.join('Area_pixmaps', f'{i+1}.png')) 
             self.mapButtons[i].setMask(pixmap.scaled(self.mapButtons[i].size(), 
                                                     Qt.IgnoreAspectRatio).mask())
@@ -677,6 +681,7 @@ class MainWindow(QMainWindow):
             name = self.areaBtnNames[i]
             self.areaBtn[name] = QPushButton()
             
+# Add sys._MEIPASS here to package into one file
             pixmap = QPixmap(os.path.join('Area_Buttons_pixmaps', 
                                   self.areaBtnNames[i] + '.png'))
 
@@ -753,7 +758,7 @@ class MainWindow(QMainWindow):
                                           
     def saveData(self):
         self.outputFile, _filter = QFileDialog.getSaveFileName(self, 'Save statistics', 
-                          os.path.splitext(self.inputFileName)[0]+'_statistics.xlsx')
+                          os.path.splitext(self.inputFileName)[0]+'_statistics.csv')
         with open(self.outputFile, 'w+', newline='') as output:
             writer = csv.writer(output, dialect='excel')
             # Write horizontal header
