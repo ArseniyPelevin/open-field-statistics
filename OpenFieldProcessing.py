@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 
-#from PyQt6.QtWidgets import (QApplication, QMainWindow, QLabel, QLineEdit,
-#     QVBoxLayout, QHBoxLayout, QGridLayout, QWidget, QPushButton, QFileDialog)
-#from PyQt6.QtCore import QEvent
-#from PyQt6.QtGui import QFontMetrics, QFont
-
 import os
 import re
 import pandas as pd
@@ -12,9 +7,18 @@ import numpy as np
 import math as m
 import csv
 
-from PyQt6.QtWidgets import *
-from PyQt6.QtCore import *
-from PyQt6.QtGui import *
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QFileDialog,
+    QLabel, QLineEdit, QPushButton, QSpacerItem,
+    QVBoxLayout, QHBoxLayout, QGridLayout,  
+    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView, 
+    QStyleFactory, QStyledItemDelegate
+)
+from PyQt6.QtCore import Qt, QSize, pyqtSlot, QEvent
+from PyQt6.QtGui import (
+    QFontMetrics, QIcon,
+    QPen, QPixmap, QPainter, QColor, QPalette
+)
 
 from superqt import QRangeSlider
 
