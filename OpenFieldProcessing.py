@@ -20,6 +20,8 @@ from superqt import QRangeSlider
 
 from OpenFieldStatistics import OFStatistics
 # from NewStatistics import OFStatistics
+
+#TODO Expand zoneCoolors to allow more zones
 from MapButtonStyleSheet import styleSheet, zoneColors, color
 
 
@@ -39,16 +41,18 @@ class MainWindow(QMainWindow):
         self.setWidgets()
         self.setSignals()
         self.setLayouts()
-        
-    # Set default variables
+
+    
     def setVariables(self):
+        
+        #TODO delete individual parameters to add global settings
         self.params = {'numLasers': 16, 'mapSide': 320, 
                       'boxSide': 40, 'numStatParam': 5}
-        self.numLasers = 16
-        self.mapSide = 320 # px
+        self.numLasers = self.params['numLasers']
+        self.mapSide = self.params['mapSide'] # px
         # self.mapSide = 608
         #self.mapSide = min(self.height(), self.width()/2) * 2/3
-        self.numStatParam = 5  # Time, distance, velocity, rearings, rearings time
+        self.numStatParam = self.params['numStatParam']  # Time, distance, velocity, rearings, rearings time
         self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
 
         self.zoneCoord = np.ones((self.numLasers, self.numLasers))     
@@ -474,6 +478,8 @@ class MainWindow(QMainWindow):
     def addNewZone(self, fillTable=True, numNewZones=1):
 
         for i in range(numNewZones):
+            
+            #TODO TO make more zones delete it
             if self.numZones == 4:                 # Maximum 4 zones
                 return
             self.numZones += 1
@@ -495,8 +501,11 @@ class MainWindow(QMainWindow):
         # self.adjustSize()
         
     def mapBtnChecked(self, x=-1, y=-1, s=-1):
+        
+        #TODO TO make more zones delete it
         if self.numZones == 4:
             return
+        
         self.addZoneBtn.setEnabled(True)
         # Now that we selected new area we can add it to new zone
         

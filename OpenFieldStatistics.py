@@ -5,12 +5,14 @@ from statistics import fmean
 import pandas as pd
 
 class OFStatistics():
-    def __init__(self, csv_df, param):       
+    def __init__(self, csv_df, params):       
         csv_df.columns.values[0] = "Time" 
-        self.data = self.getData(csv_df, param)
+        self.data = self.getData(csv_df, params)
         self.totalTime = round(self.data.at[self.data.index[-1], 'time'], 1)
         self.totalDistance = round(self.totalDistance, 1)
         self.totalVelocity = round(self.totalDistance / self.totalTime, 1)
+        
+        #TODO delete it
         print(f'Total time: {self.totalTime}\n',
               f'Total distance: {self.totalDistance}\n',
               f'Total Velocity: {self.totalVelocity}\n',
@@ -31,11 +33,15 @@ class OFStatistics():
             x = fmean([row['X1'], row['X2']])
             y = fmean([row['Y1'], row['Y2']])
             
+            # Chenge from original bottom-left coordinates to numpy and qt top-left
+            y = params['numLasers'] - y
+            
             # Rearing
             z = True if row['Z'] else False   # 'numpy.bool_' to 'bool'
             
             if j == 0:  # Animal is detected and recorded for the first time
                 # Time of the first animal detection
+                #TODO add an if here for 7 decimals
                 timeStart = datetime.strptime(row['Time'][:-1], '%H:%M:%S.%f')
                             # Input file has 7 decimals in time instead of 6
                 time = 0
