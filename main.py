@@ -178,8 +178,7 @@ class MainWindow(QMainWindow):
         self.areaBtn['Square'].toggled.connect(self.squareMapButtons)
         
         # Check if input is correct
-        self.periodLine.textEdited.connect(lambda: self.checkCorrect(self.periodLine,
-                                                                     period=True))
+        self.periodLine.textEdited.connect(lambda: self.checkCorrect(self.periodLine))
         self.startTime.textEdited.connect(lambda: self.checkCorrect(self.startTime))
         self.endTime.textEdited.connect(lambda: self.checkCorrect(self.endTime))
         
@@ -326,7 +325,7 @@ class MainWindow(QMainWindow):
             timeEnd = round((i+1) * self.period, 1)
             if timeEnd > selectedInterval:
                 timeEnd = selectedInterval
-            self.periodTimes.append([timeStart, timeEnd])
+            self.periodTimes.append((timeStart, timeEnd))
             numRows = self.table.rowCount()
             self.table.setRowCount(numRows+n)
             for j in range(n):
@@ -346,9 +345,20 @@ class MainWindow(QMainWindow):
         self.selectedStat(start, end)
         
     def textUpdateTimeRange(self):
-        start = float(self.startTime.text())
-        end = float(self.endTime.text())
-        
+        # If start time is empty - set start to 0
+        try:
+            start = float(self.startTime.text())
+        except ValueError:  # Empty line
+            start = 0
+            self.startTime.setText(str(0))
+
+        # If end time is empty - set end to max time
+        try:
+            end = float(self.endTime.text())
+        except ValueError:  # Empty line
+            end = self.stat.totalTime
+            self.endTime.setText(str(self.stat.totalTime))
+
         # Update slider values based on text editors
         self.timeRangeSlider.setValue([start*10, end*10])
         
