@@ -4,7 +4,7 @@ from statistics import fmean
 
 import pandas as pd
 
-class OFStatistics():
+class DataProcessing():
     def __init__(self, csv_df, params):       
         csv_df.columns.values[0] = "Time" 
         self.data = self.getData(csv_df, params)

@@ -22,20 +22,16 @@ from PyQt6.QtGui import (
 
 from superqt import QRangeSlider
 
-from OpenFieldStatistics import OFStatistics
-# from NewStatistics import OFStatistics
-
+from OpenFieldDataProcessing import DataProcessing
 #TODO Expand zoneCoolors to allow more zones
 from MapButtonStyleSheet import styleSheet, zoneColors, color
 
 
-     
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("OpenField Statistics")
-        self.setWindowIcon(QIcon('logo.png'))
+        self.setWindowTitle("Open Field Statistics")
+        self.setWindowIcon(QIcon('logo.ico'))
         
         # screen = app.primaryScreen().size()
         # self.setMaximumSize(screen)
@@ -64,10 +60,6 @@ class MainWindow(QMainWindow):
         
         self.verticalHeaders = ['Time (s)', 'Distance (cm)', 'Velocity (cm/s)', 
                                 'Rearings number', 'Rearings time (s)']
-        # self.headers_total = ['Total time, s', 'Total distance, cm',
-        #                       'Total velocity, cm/s', 'Total rearings']
-        # self.headers_selected = ['Selected time, s', 'Selected distance, cm', 
-        #                          'Selected velocity, cm/s', 'Selected rearings']
         self.hasSelectedStat = False
     
     # def resizeEvent(self, e):
@@ -131,7 +123,7 @@ class MainWindow(QMainWindow):
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-        self.table.setItemDelegate(Delegate(self.table))
+        self.table.setItemDelegate(Delegate(self.table, self))
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         headersTotal = [f'Total time, {x}' for x in self.verticalHeaders]
         self.table.setVerticalHeaderLabels(headersTotal)
@@ -249,7 +241,7 @@ class MainWindow(QMainWindow):
         # file = r"C:\OpenField\Data1.csv"
         # self.inputFileName = file
         self.csv_df = pd.read_csv(self.inputFileName, delimiter=";")
-        self.stat = OFStatistics(self.csv_df, self.params) 
+        self.stat = DataProcessing(self.csv_df, self.params) 
         
         # Update variables
         self.startSelected = 0
@@ -386,17 +378,6 @@ class MainWindow(QMainWindow):
         if not float(self.startTime.text()) < float(self.endTime.text()):
             lineEdit.backspace()
             return
-        
-    def updateMap(self):
-        start, end = [x/10 for x in self.timeRangeSlider.value()]
-        
-        # Update values in text editors based on slider
-        self.startTime.setText(str(start))
-        self.endTime.setText(str(end))
-        
-        iStart = self.stat.timeIndex(start)
-        iEnd = self.stat.timeIndex(end)
-        self.drawPath(iStart, iEnd)
                 
     def drawMap(self):
         canvas = QPixmap(self.mapSide + 1, self.mapSide + 1)
@@ -413,6 +394,17 @@ class MainWindow(QMainWindow):
         painter.end()
         self.map.setPixmap(canvas) 
         return cell, canvas
+    
+    def updateMap(self):
+        start, end = [x/10 for x in self.timeRangeSlider.value()]
+        
+        # Update values in text editors based on slider
+        self.startTime.setText(str(start))
+        self.endTime.setText(str(end))
+        
+        iStart = self.stat.timeIndex(start)
+        iEnd = self.stat.timeIndex(end)
+        self.drawPath(iStart, iEnd)
             
     def drawPath(self, iStart, iEnd):
         cell, canvas = self.drawMap()
@@ -676,7 +668,7 @@ class MainWindow(QMainWindow):
             self.mapButtons[i].setFixedSize(self.mapSide, self.mapSide)
             self.mapButtons[i].setCheckable(True)
             
-# Add sys._MEIPASS here to package into one file
+#TODO Add sys._MEIPASS here to package into one file
             pixmap = QPixmap(os.path.join('Area_pixmaps', f'{i+1}.png')) 
             self.mapButtons[i].setMask(pixmap.scaled(self.mapButtons[i].size(), 
                                                     Qt.IgnoreAspectRatio).mask())
@@ -807,6 +799,9 @@ class MainWindow(QMainWindow):
                                            for zone in range(self.numZones+1)])
         
 class Delegate(QStyledItemDelegate):
+    def __init__ (self, parent, mywindow):
+        super ().__init__ (parent)
+        self.mywindow = mywindow
     
     def paint(self, painter, option, index):
         super().paint(painter, option, index) 
@@ -840,9 +835,10 @@ class Delegate(QStyledItemDelegate):
         color = fg * fga / a + bg * bga * (1 - fga) / a
         return map(int, [*(color * 255), a * 255])
     
-            
-app = QApplication(os.sys.argv)
-app.setStyle(QStyleFactory.create('Fusion'))
-mywindow = MainWindow()
-mywindow.show()
-app.exec()
+
+if __name__ == '__main__':            
+    app = QApplication(os.sys.argv)
+    app.setStyle(QStyleFactory.create('Fusion'))
+    mywindow = MainWindow()
+    mywindow.show()
+    app.exec()
