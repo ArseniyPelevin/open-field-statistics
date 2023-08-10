@@ -314,8 +314,8 @@ class MainWindow(QMainWindow):
         for i in range(self.numPeriods):
             timeStart = round(i * self.period, 1)
             timeEnd = round((i+1) * self.period, 1)
-            if timeEnd > self.endSelected:
-                timeEnd = self.endSelected
+            if timeEnd > selectedInterval:
+                timeEnd = selectedInterval
             numRows = self.table.rowCount()
             self.table.setRowCount(numRows+n)
             for j in range(n):
