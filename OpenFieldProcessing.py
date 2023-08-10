@@ -48,10 +48,15 @@ class MainWindow(QMainWindow):
         self.numStatParam = 4  # Time, distance, velocity, rearings
         self.statParam = ['time', 'dist', 'vel', 'rear']
 
-        # OFStatistics.table(zones) default values
         self.zoneCoord = np.ones((self.numLasers, self.numLasers))     
         self.numZones = 0
         
+        self.verticalHeaders = ['Time (s)', 'Distance (cm)', 
+                                'Velocity (cm/s)', 'Rearings']
+        self.headers_total = ['Total time, s', 'Total distance, cm',
+                              'Total velocity, cm/s', 'Total rearings']
+        self.headers_selected = ['Selected time, s', 'Selected distance, cm', 
+                                 'Selected velocity, cm/s', 'Selected rearings']
         self.hasSelectedStat = False
     
     # def resizeEvent(self, e):
@@ -107,21 +112,18 @@ class MainWindow(QMainWindow):
         # self.table = QTableWidget(self.numStatParam, 1, self.tableLabel)
         self.table = QTableWidget(self.numStatParam, 1)
         
-        # Forbid user touch anything in the table
+        # Forbid user to touch anything in the table
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setFocusPolicy(Qt.NoFocus)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        
-        # self.table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-        # self.table.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.MinimumExpanding)
-        # self.table.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         self.table.setItemDelegate(Delegate(self.table))
-        self.table.setVerticalHeaderLabels(['Total time, s', 'Total distance, cm', 
-                                            'Total velocity, cm/s', 'Total rearings'])
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        headersTotal = [f'Total time, {x}' for x in self.verticalHeaders]
+        self.table.setVerticalHeaderLabels(headersTotal)
         self.table.setHorizontalHeaderLabels(['Whole field'])
         self.table.setStyleSheet('''
                                 QTableView {
@@ -259,13 +261,14 @@ class MainWindow(QMainWindow):
         
         if start == 0 and end == self.stat.totalTime:
             self.hasSelectedStat = False
-        elif not self.hasSelectedStat:
-            headers = ['Selected time, s', 'Selected distance, cm', 
-                       'Selected velocity, cm/s', 'Selected rearings']
-            headers = list(map(QTableWidgetItem, headers))
+        else:
+            headersSelected = [QTableWidgetItem(f'Selected time {start}-{end} s,\n{x}')
+                               for x in self.verticalHeaders]            
             for i in range(n):
-                self.table.insertRow(i+n)
-                self.table.setVerticalHeaderItem(i+n, headers[i])
+                if self.hasSelectedStat:
+                    self.table.removeRow(n+i)
+                self.table.insertRow(n+i)
+                self.table.setVerticalHeaderItem(n+i, headersSelected[i])
             self.hasSelectedStat = True
         
         self.startSelected = start
@@ -315,17 +318,11 @@ class MainWindow(QMainWindow):
                 timeEnd = self.endSelected
             numRows = self.table.rowCount()
             self.table.setRowCount(numRows+n)
-            self.table.setVerticalHeaderItem(numRows, 
-                            QTableWidgetItem(f'{timeStart}-{timeEnd} s'))
-            self.table.setVerticalHeaderItem(numRows+1, 
-                            QTableWidgetItem('Distance, cm'))
-            self.table.setVerticalHeaderItem(numRows+2, 
-                            QTableWidgetItem('Velocity, cm/s'))
-            self.table.setVerticalHeaderItem(numRows+3, 
-                            QTableWidgetItem('Rearings'))
-            # if (numRows // n) % 2 == 0:
-            #     for h in range(n):
-            #         self.table.verticalHeaderItem(numRows + h).setBackground(Qt.black)
+            for j in range(n):
+                self.table.setVerticalHeaderItem(numRows + j, 
+                    QTableWidgetItem(f'{timeStart}-{timeEnd} s, ' 
+                                     + f'{self.verticalHeaders[j]}'))
+                print(f'{self.verticalHeaders[j]}', j)
             
         self.fillTable()
         
@@ -710,7 +707,7 @@ class MainWindow(QMainWindow):
         self.adjustSize()
         
         try:
-            tableData = self.stat.table(self.zoneCoord, self.startSelected, 
+            self.tableData = self.stat.table(self.zoneCoord, self.startSelected, 
                                         self.endSelected, self.period, 
                                         self.statParam)
         except AttributeError:  # If .csv has not yet been opened
@@ -723,7 +720,7 @@ class MainWindow(QMainWindow):
         for zone in range(self.numZones+1):
             for k in range(n):
                 key = self.statParam[k]
-                val = round(tableData[0][zone][key], 1)
+                val = round(self.tableData[0][zone][key], 1)
                 item = QTableWidgetItem(str(val))
                 self.table.setItem(k, zone, item)
                 
@@ -732,7 +729,7 @@ class MainWindow(QMainWindow):
             for zone in range(self.numZones+1):
                 for k in range(n):
                     key = self.statParam[k]
-                    val = round(tableData[-1][zone][key], 1)
+                    val = round(self.tableData[-1][zone][key], 1)
                     item = QTableWidgetItem(str(val))
                     self.table.setItem(n+k, zone, item)
               
@@ -741,19 +738,30 @@ class MainWindow(QMainWindow):
             for zone in range(self.numZones+1):
                 for k in range(n):
                     key = self.statParam[k]
-                    val = round(tableData[per][zone][key], 1)
+                    val = round(self.tableData[per][zone][key], 1)
                     item = QTableWidgetItem(str(val))
                     self.table.setItem(n*(per+s) + k, zone, item)
                                           
     def saveData(self):
-        self.outputFile = QFileDialog.getSaveFileName(self, 'Save statistics', 
-                          os.path.splitext(self.inputFile)[0]+'_statistics.csv')
-        with open(self.outputFile, 'w+') as output:
+        self.outputFile, _filter = QFileDialog.getSaveFileName(self, 'Save statistics', 
+                          os.path.splitext(self.inputFileName)[0]+'_statistics.csv')
+        print(self.outputFile)
+        with open(self.outputFile, 'w+', newline='') as output:
             writer = csv.writer(output)
-            writer.writerow([''] + [f'Zone {x+1}' for x in range(self.numZones)])
-            for per in range(self.numPeriods+2):
-                for key in range(4):
-                    pass
+            # Write header
+            writer.writerow(['', 'Whole field'] 
+                            + [f'Zone {x+1}' for x in range(self.numZones)])
+            # Write Total time 
+            
+            for k in range(4):
+                    key = self.statParam[k]
+                    writer.writerow([round(self.tableData[per][zone][key], 1)
+                                     for zone in range(self.numZones+1)])
+            for per in range(1, self.numPeriods+1):
+                for k in range(4):
+                    key = self.statParam[k]
+                    writer.writerow([round(self.tableData[per][zone][key], 1)
+                                     for zone in range(self.numZones+1)])
         
 class Delegate(QStyledItemDelegate):
     
