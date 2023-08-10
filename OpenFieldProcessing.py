@@ -76,7 +76,7 @@ class MainWindow(QMainWindow):
     def setWidgets(self):
         self.getFileButton = QPushButton("Select file")
         self.getFileButton.setFixedWidth(80)
-        self.fileName = QLabel()
+        self.fileNameLabel = QLabel()
         
         self.startTime = QLineEdit(alignment = Qt.AlignLeft)
         self.startTime.setFixedWidth(60)
@@ -202,7 +202,7 @@ class MainWindow(QMainWindow):
         
         self.controlLayout = QGridLayout()
         self.controlLayout.addWidget(self.getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
-        self.controlLayout.addWidget(self.fileName, 0, 1, 1, 2, Qt.AlignTop)
+        self.controlLayout.addWidget(self.fileNameLabel, 0, 1, 1, 2)
         self.controlLayout.addWidget(self.addZoneBtn, 1, 0, 1, 2, Qt.AlignRight)
         self.controlLayout.addLayout(self.areaButtonLayout, 2, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.map, 2, 1, 1, 1, Qt.AlignLeft)
@@ -231,13 +231,13 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
         
     def getFile(self):
-        # self.inputFile, _filter = QFileDialog.getOpenFileName(self, 
-        #                      'Open .csv file', 
-        #                      os.path.join('C:', 'OpenField', 'Data1.csv'), 
-        #                      'CSV files (*.csv)')
-        file = r"C:\OpenField\Data1.csv"
-        self.inputFile = file
-        self.csv_df = pd.read_csv(file, delimiter=";")
+        self.inputFileName, _filter = QFileDialog.getOpenFileName(self, 
+                              'Open .csv file', 
+                              os.path.join('C:', 'OpenField', 'Data1.csv'), 
+                              'CSV files (*.csv)')
+        # file = r"C:\OpenField\Data1.csv"
+        # self.inputFileName = file
+        self.csv_df = pd.read_csv(self.inputFileName, delimiter=";")
         self.stat = OFStatistics(self.csv_df, self.params) 
         
         # Update variables
@@ -247,7 +247,12 @@ class MainWindow(QMainWindow):
         self.numPeriods = 1
         
         # Update window
-        self.fileName.setText(file)  
+            # Set file name label's elide mode
+        metrix = QFontMetrics(self.fileNameLabel.font())
+        width = self.fileNameLabel.width() - 2;
+        clippedText = metrix.elidedText(self.inputFileName, Qt.ElideMiddle, width)
+        self.fileNameLabel.setText(clippedText)
+        
         self.setTimeRange()
         self.drawPath(0, self.stat.data.index[-1])
         self.fillTable()
