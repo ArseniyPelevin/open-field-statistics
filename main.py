@@ -868,14 +868,17 @@ class MainWindow(QMainWindow):
         self.outputFile, _filter = QFileDialog.getSaveFileName(self, 'Save statistics',
                           os.path.splitext(self.inputFileName)[0]+'_statistics.csv')
         with open(self.outputFile, 'w+', newline='') as output:
-            writer = csv.writer(output, dialect='excel')
+            writer = csv.writer(output, delimiter=';')
+            writer.writerow(['sep=;'])
+
+            n = self.numStatParam
 
             # Write horizontal header
             writer.writerow(['', '', 'Whole field']
                             + [f'Zone {x+1}' for x in range(self.numZones)])
 
             # Write Total time statistics
-            for k in range(4):
+            for k in range(n):
                 key = self.statParam[k]
                 writer.writerow(['Total time', f'{self.verticalHeaders[k]}']
                                 + [round(self.tableData[0][zone][key], 1)
@@ -883,7 +886,7 @@ class MainWindow(QMainWindow):
 
             # Write Selected time statistics
             if self.hasSelectedStat:
-                for k in range(4):
+                for k in range(n):
                         key = self.statParam[k]
                         writer.writerow([
                     f'Selected time {self.startSelected}-{self.endSelected} s',
@@ -894,7 +897,7 @@ class MainWindow(QMainWindow):
             # Write Periods statistics
             if self.numPeriods != 0:
                 for per in range(self.numPeriods):
-                    for k in range(4):
+                    for k in range(n):
                         key = self.statParam[k]
                         start = self.periodTimes[per][0]
                         end = self.periodTimes[per][1]
