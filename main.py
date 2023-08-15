@@ -8,13 +8,13 @@ import math as m
 import csv
 
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QFileDialog,
+    QApplication, QMainWindow, QWidget, QFileDialog, QToolTip,
     QLabel, QLineEdit, QPushButton, QSpacerItem,
     QVBoxLayout, QHBoxLayout, QGridLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QStyleFactory, QStyledItemDelegate
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSlot, QEvent
+from PyQt6.QtCore import Qt, QSize, pyqtSlot, QEvent, QVariantAnimation
 from PyQt6.QtGui import (
     QFontMetrics, QIcon,
     QPen, QPixmap, QPainter, QColor, QPalette
@@ -391,6 +391,37 @@ class MainWindow(QMainWindow):
 
         self.selectedStatistics(start, end)
 
+    def errorWarning(self, widget):
+        ''' Flash red in the field with an error '''
+
+        def updateColor(w):
+            # Calculate weighted average with changing weight ratio
+            nextColor = np.average(colors, axis=0, weights=(w, 1-w))
+            nextColor = QColor(*nextColor.astype(int).tolist())
+
+            palette.setColor(QPalette.Base, nextColor)
+            widget.setPalette(palette)
+
+        palette = QPalette()
+
+        # Start from red and average it to the default background over a second
+        defaultColor = widget.palette().color(QPalette.Active, QPalette.Base)
+        warningColor = QColor(Qt.red)
+        colors = np.zeros((2, 4))
+        colors[0] = defaultColor.getRgb()
+        colors[1] = warningColor.getRgb()
+
+        # Variant animation over ratio between default and warning colors
+        self.animation = QVariantAnimation()
+        self.animation.setDuration(1000)
+        self.animation.setStartValue(0.)
+        self.animation.setEndValue(1.)
+
+        self.animation.valueChanged.connect(lambda value: updateColor(value))
+        self.animation.start()
+
+        # errorMessage = QToolTip.showText(self.mapToGlobal(widget.pos()), 'Warning', widget)
+
     def checkCorrect(self, lineEdit):
         '''
         Check if time range and period inputs are correct,
@@ -404,6 +435,7 @@ class MainWindow(QMainWindow):
         # Not a decimal
         if not re.match(r'^\d+\.?\d*$', lineEdit.text()):
             lineEdit.backspace()
+            self.errorWarning(lineEdit)
             return
 
         inputValue = float(lineEdit.text())
