@@ -56,6 +56,7 @@ class MainWindow(QMainWindow):
         self.numStatParam = self.params['numStatParam']
         self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
 
+        #???
         self.zoneCoord = np.ones((self.numLasers, self.numLasers))
         self.numZones = 0
 
@@ -91,6 +92,7 @@ class MainWindow(QMainWindow):
         self.endTime = QLineEdit(alignment = Qt.AlignRight)
         self.endTime.setFixedWidth(60)
         self.endTime.setDisabled(True)
+        self.selectedTimeLabel = QLabel()
         self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
         self.timeRangeSlider.setDisabled(True)
 
@@ -98,6 +100,9 @@ class MainWindow(QMainWindow):
         self.periodLine = QLineEdit(alignment = Qt.AlignRight)
         self.periodLine.setFixedWidth(60)
         self.periodLine.setDisabled(True)
+        # Default LineEdit background will be needed for error warning
+        self.defaultLineEditBackground = self.periodLine.palette().color(
+                                         QPalette.Active, QPalette.Base)
         self.mins = QLabel(' seconds')
 
         self.addZoneBtn = QPushButton('Add zone')
@@ -179,18 +184,20 @@ class MainWindow(QMainWindow):
         self.areaBtn['Row'].toggled.connect(self.rowMapButtons)
         self.areaBtn['Square'].toggled.connect(self.squareMapButtons)
 
-        # Check if input is correct
-        self.periodLine.textEdited.connect(lambda: self.checkCorrect(self.periodLine))
-        self.startTime.textEdited.connect(lambda: self.checkCorrect(self.startTime))
-        self.endTime.textEdited.connect(lambda: self.checkCorrect(self.endTime))
+        # Check if input format is correct
+        self.periodLine.textEdited.connect(lambda: self.checkFormat(self.periodLine))
+        self.startTime.textEdited.connect(lambda: self.checkFormat(self.startTime))
+        self.endTime.textEdited.connect(lambda: self.checkFormat(self.endTime))
 
         # Update period
         self.periodLine.editingFinished.connect(lambda:
-                                        self.updatePeriod(isUsersPeriod=True))
+                                        self.checkPeriodValue(self.periodLine))
 
         # Update time range from text
-        self.startTime.editingFinished.connect(self.textUpdateTimeRange)
-        self.endTime.editingFinished.connect(self.textUpdateTimeRange)
+        self.startTime.editingFinished.connect(lambda:
+                                       self.checkStartTimeValue(self.startTime))
+        self.endTime.editingFinished.connect(lambda:
+                                       self.checkEndTimeValue(self.endTime))
 
         # Update time range from slider
         self.timeRangeSlider.sliderMoved.connect(self.updateMap)
@@ -199,8 +206,9 @@ class MainWindow(QMainWindow):
     def setLayouts(self):
         timeRangeLayout = QGridLayout()
         timeRangeLayout.addWidget(self.startTime, 0, 0, Qt.AlignLeft)
-        timeRangeLayout.addWidget(self.endTime, 0, 1, Qt.AlignRight)
-        timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 2, Qt.AlignBottom)
+        timeRangeLayout.addWidget(self.selectedTimeLabel, 0, 1, Qt.AlignCenter)
+        timeRangeLayout.addWidget(self.endTime, 0, 2, Qt.AlignRight)
+        timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 3, Qt.AlignBottom)
 
         periodLayout = QHBoxLayout()
         periodLayout.addWidget(self.timePeriod, alignment = Qt.AlignRight)
@@ -254,6 +262,8 @@ class MainWindow(QMainWindow):
         # Update variables
         self.startSelected = 0
         self.endSelected = self.stat.totalTime
+        self.selectedTime = self.endSelected
+        self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
         self.period = self.stat.totalTime
         self.numPeriods = 0
 
@@ -295,6 +305,8 @@ class MainWindow(QMainWindow):
 
         self.startSelected = start
         self.endSelected = end
+        self.selectedTime = round(self.endSelected - self.startSelected, 1)
+        self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
         self.updatePeriod()
 
         self.drawPath(iStart, iEnd)
@@ -314,7 +326,7 @@ class MainWindow(QMainWindow):
         self.startTime.setText(str(0))
         self.endTime.setText(str(self.stat.totalTime))
 
-    def updatePeriod(self, isUsersPeriod=False):
+    def updatePeriod(self, period=0, isUsersPeriod=False):
         '''
         Selected time is split to periods of user-defined length in seconds.
         Statistics for each period (and in each zone) is shown in the table.
@@ -323,34 +335,28 @@ class MainWindow(QMainWindow):
         isUserPeriod == False: the period is defined by Total or Selected time
         '''
 
+        # Period statistics goes after Total time and Selected time in table
         n = self.numStatParam
         self.table.setRowCount(n + n * self.hasSelectedStat)
-        # Period statistics goes after Total time and Selected time in table
 
-        try:
-            self.period = float(self.periodLine.text())
-        except ValueError:  # Empty line
-            self.period = 0
-        selectedInterval = round(self.endSelected-self.startSelected, 1)
         # Period is not defined
-        if self.period == 0 or self.period >= selectedInterval \
-                            or not isUsersPeriod:
-            self.period = selectedInterval  # Default value
+        if period == 0 or period == self.selectedTime or not isUsersPeriod:
+            self.period = self.selectedTime  # Default value
             self.periodLine.setText('')
-            isUsersPeriod = False
             self.numPeriods = 0
             self.periodTimes = []
             self.fillTable()
             return
 
-        self.numPeriods = m.ceil(selectedInterval / self.period)
+        self.period = period
+        self.numPeriods = m.ceil(self.selectedTime / self.period)
         self.periodTimes = []   # Start and end of each period
                                 # ! relative to Selected time !
         for i in range(self.numPeriods):
             timeStart = round(i * self.period, 1)
             timeEnd = round((i+1) * self.period, 1)
-            if timeEnd > selectedInterval:
-                timeEnd = selectedInterval
+            if timeEnd > self.selectedTime:
+                timeEnd = self.selectedTime
             self.periodTimes.append((timeStart, timeEnd))
             numRows = self.table.rowCount()
             self.table.setRowCount(numRows+n)
@@ -371,27 +377,13 @@ class MainWindow(QMainWindow):
 
         self.selectedStatistics(start, end)
 
-    def textUpdateTimeRange(self):
-        # If start time is empty - set start to 0
-        try:
-            start = float(self.startTime.text())
-        except ValueError:  # Empty line
-            start = 0
-            self.startTime.setText(str(0))
-
-        # If end time is empty - set end to max time
-        try:
-            end = float(self.endTime.text())
-        except ValueError:  # Empty line
-            end = self.stat.totalTime
-            self.endTime.setText(str(self.stat.totalTime))
+    def textUpdateTimeRange(self, start, end):
 
         # Update slider values based on text editors
         self.timeRangeSlider.setValue([start*10, end*10])
-
         self.selectedStatistics(start, end)
 
-    def errorWarning(self, widget):
+    def errorWarning(self, widget, errorMessage=''):
         ''' Flash red in the field with an error '''
 
         def updateColor(w):
@@ -399,13 +391,13 @@ class MainWindow(QMainWindow):
             nextColor = np.average(colors, axis=0, weights=(w, 1-w))
             nextColor = QColor(*nextColor.astype(int).tolist())
 
-            palette.setColor(QPalette.Base, nextColor)
+            palette.setColor(QPalette.Active, QPalette.Base, nextColor)
             widget.setPalette(palette)
 
         palette = QPalette()
 
         # Start from red and average it to the default background over a second
-        defaultColor = widget.palette().color(QPalette.Active, QPalette.Base)
+        defaultColor = self.defaultLineEditBackground
         warningColor = QColor(Qt.red)
         colors = np.zeros((2, 4))
         colors[0] = defaultColor.getRgb()
@@ -420,43 +412,81 @@ class MainWindow(QMainWindow):
         self.animation.valueChanged.connect(lambda value: updateColor(value))
         self.animation.start()
 
-        # errorMessage = QToolTip.showText(self.mapToGlobal(widget.pos()), 'Warning', widget)
+        # Show a tooltip explaining the error
+        QToolTip.showText(self.mapToGlobal(widget.pos()), errorMessage, widget)
 
-    def checkCorrect(self, lineEdit):
+    def checkFormat(self, lineEdit):
         '''
-        Check if time range and period inputs are correct,
+        Check if time range and period inputs are correct floats,
         delete last input char otherwise.
 
         lineEdit: the QLineEdit widget, which is being checked here
-        period == True: if called from period edit
-        period == False: if called from Selected time edit
         '''
 
         # Not a decimal
         if not re.match(r'^\d+\.?\d*$', lineEdit.text()):
             lineEdit.backspace()
-            self.errorWarning(lineEdit)
-            return
 
-        inputValue = float(lineEdit.text())
+    def checkPeriodValue(self, lineEdit):
+        try:
+            period = float(lineEdit.text())
+        # Empty line was entered
+        except ValueError:
+            period = 0
+        else:
+            if period > self.selectedTime:
+                errorMessage = ('Period should be in the range:\n'
+                                + f'0 < period < {self.selectedTime}')
+                self.errorWarning(lineEdit, errorMessage)
+                period = self.selectedTime
 
-        # Out of total time range
-        # No need to check for start < 0, we can not enter negative numbers
-        if inputValue > self.stat.totalTime:
-            lineEdit.backspace()
-            return
+        self.updatePeriod(period, isUsersPeriod=True)
 
-        # period > selected time interval
-        if (lineEdit is self.periodLine
-            and inputValue > round(self.endSelected-self.startSelected, 1)):
-        # if period > round(self.endSelected-self.startSelected, 1):
-            lineEdit.backspace()
-            return
+    def checkStartTimeValue(self, lineEdit):
+        try:
+            start = float(lineEdit.text())
+        # Empty line was entered as start time, set start to 0
+        except ValueError:
+            start = 0
+            self.startTime.setText(str(start))
+        else:
+            # Selected start > Selected end, back to initial value
+            if start >= self.endSelected:
+                errorMessage = ('Start time should be in the range:\n'
+                                + f'0 <= start time < {self.endSelected}')
+                self.errorWarning(lineEdit, errorMessage)
 
-        # start >= end in Selected time
-        if not float(self.startTime.text()) < float(self.endTime.text()):
-            lineEdit.backspace()
-            return
+                start = self.startSelected
+                self.startTime.setText(str(start))
+
+        self.textUpdateTimeRange(start, self.endSelected)
+
+    def checkEndTimeValue(self, lineEdit):
+        try:
+            end = float(lineEdit.text())
+        # Empty line was entered as end time, set end to max total time
+        except ValueError:
+            end = self.stat.totalTime
+            self.endTime.setText(str(end))
+        else:
+            errorMessage = ('End time should be in the range:\n'
+                            + f'{self.startSelected} < end time <= {self.stat.totalTime}')
+
+            # Selected end < Selected start, back to previous value
+            if end <= self.startSelected:
+                self.errorWarning(lineEdit, errorMessage)
+
+                end = self.endSelected
+                self.endTime.setText(str(end))
+
+            # Selected end > total time, set Selected time to max total time
+            elif end > self.stat.totalTime:
+                self.errorWarning(lineEdit, errorMessage)
+
+                end = self.stat.totalTime
+                self.endTime.setText(str(end))
+
+        self.textUpdateTimeRange(self.startSelected, end)
 
     def drawMap(self):
         canvas = QPixmap(self.mapSide + 1, self.mapSide + 1)
