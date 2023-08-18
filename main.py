@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import re
 import pandas as pd
 import numpy as np
 import math as m
@@ -14,10 +13,11 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QStyleFactory, QStyledItemDelegate
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSlot, QEvent, QVariantAnimation
+from PyQt6.QtCore import (Qt, QSize, pyqtSlot, QEvent,
+                          QVariantAnimation, QRegularExpression)
 from PyQt6.QtGui import (
     QFontMetrics, QIcon,
-    QPen, QPixmap, QPainter, QColor, QPalette
+    QPen, QPixmap, QPainter, QColor, QPalette, QRegularExpressionValidator
 )
 
 from superqt import QRangeSlider
@@ -103,6 +103,7 @@ class MainWindow(QMainWindow):
         # Default LineEdit background will be needed for error warning
         self.defaultLineEditBackground = self.periodLine.palette().color(
                                          QPalette.Active, QPalette.Base)
+        #???
         self.mins = QLabel(' seconds')
 
         self.addZoneBtn = QPushButton('Add zone')
@@ -112,6 +113,13 @@ class MainWindow(QMainWindow):
         self.saveButton = QPushButton('Save data')
         self.saveButton.setFixedWidth(80)
         self.saveButton.setDisabled(True)
+
+        # Set input validator
+        rx = QRegularExpression(r'^\d+\.?\d*$')
+        inputValidator = QRegularExpressionValidator(rx)
+        self.periodLine.setValidator(inputValidator)
+        self.startTime.setValidator(inputValidator)
+        self.endTime.setValidator(inputValidator)
 
         self.areaButtons()
         self.map = QLabel()
@@ -184,20 +192,12 @@ class MainWindow(QMainWindow):
         self.areaBtn['Row'].toggled.connect(self.rowMapButtons)
         self.areaBtn['Square'].toggled.connect(self.squareMapButtons)
 
-        # Check if input format is correct
-        self.periodLine.textEdited.connect(lambda: self.checkFormat(self.periodLine))
-        self.startTime.textEdited.connect(lambda: self.checkFormat(self.startTime))
-        self.endTime.textEdited.connect(lambda: self.checkFormat(self.endTime))
-
         # Update period
-        self.periodLine.editingFinished.connect(lambda:
-                                        self.checkPeriodValue(self.periodLine))
+        self.periodLine.editingFinished.connect(self.checkPeriodValue)
 
         # Update time range from text
-        self.startTime.editingFinished.connect(lambda:
-                                       self.checkStartTimeValue(self.startTime))
-        self.endTime.editingFinished.connect(lambda:
-                                       self.checkEndTimeValue(self.endTime))
+        self.startTime.editingFinished.connect(self.checkStartTimeValue)
+        self.endTime.editingFinished.connect(self.checkEndTimeValue)
 
         # Update time range from slider
         self.timeRangeSlider.sliderMoved.connect(self.updateMap)
@@ -409,27 +409,15 @@ class MainWindow(QMainWindow):
         self.animation.setStartValue(0.)
         self.animation.setEndValue(1.)
 
-        self.animation.valueChanged.connect(lambda value: updateColor(value))
+        self.animation.valueChanged.connect(updateColor)
         self.animation.start()
 
         # Show a tooltip explaining the error
         QToolTip.showText(self.mapToGlobal(widget.pos()), errorMessage, widget)
 
-    def checkFormat(self, lineEdit):
-        '''
-        Check if time range and period inputs are correct floats,
-        delete last input char otherwise.
-
-        lineEdit: the QLineEdit widget, which is being checked here
-        '''
-
-        # Not a decimal
-        if not re.match(r'^\d+\.?\d*$', lineEdit.text()):
-            lineEdit.backspace()
-
-    def checkPeriodValue(self, lineEdit):
+    def checkPeriodValue(self):
         try:
-            period = float(lineEdit.text())
+            period = float(self.periodLine.text())
         # Empty line was entered
         except ValueError:
             period = 0
@@ -437,14 +425,14 @@ class MainWindow(QMainWindow):
             if period > self.selectedTime:
                 errorMessage = ('Period should be in the range:\n'
                                 + f'0 < period < {self.selectedTime}')
-                self.errorWarning(lineEdit, errorMessage)
+                self.errorWarning(self.periodLine, errorMessage)
                 period = self.selectedTime
 
         self.updatePeriod(period, isUsersPeriod=True)
 
-    def checkStartTimeValue(self, lineEdit):
+    def checkStartTimeValue(self):
         try:
-            start = float(lineEdit.text())
+            start = float(self.startTime.text())
         # Empty line was entered as start time, set start to 0
         except ValueError:
             start = 0
@@ -454,16 +442,16 @@ class MainWindow(QMainWindow):
             if start >= self.endSelected:
                 errorMessage = ('Start time should be in the range:\n'
                                 + f'0 <= start time < {self.endSelected}')
-                self.errorWarning(lineEdit, errorMessage)
+                self.errorWarning(self.startTime, errorMessage)
 
                 start = self.startSelected
                 self.startTime.setText(str(start))
 
         self.textUpdateTimeRange(start, self.endSelected)
 
-    def checkEndTimeValue(self, lineEdit):
+    def checkEndTimeValue(self):
         try:
-            end = float(lineEdit.text())
+            end = float(self.endTime.text())
         # Empty line was entered as end time, set end to max total time
         except ValueError:
             end = self.stat.totalTime
@@ -474,14 +462,14 @@ class MainWindow(QMainWindow):
 
             # Selected end < Selected start, back to previous value
             if end <= self.startSelected:
-                self.errorWarning(lineEdit, errorMessage)
+                self.errorWarning(self.endTime, errorMessage)
 
                 end = self.endSelected
                 self.endTime.setText(str(end))
 
             # Selected end > total time, set Selected time to max total time
             elif end > self.stat.totalTime:
-                self.errorWarning(lineEdit, errorMessage)
+                self.errorWarning(self.endTime, errorMessage)
 
                 end = self.stat.totalTime
                 self.endTime.setText(str(end))
