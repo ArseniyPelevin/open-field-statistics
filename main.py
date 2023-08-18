@@ -115,7 +115,7 @@ class MainWindow(QMainWindow):
         self.saveButton.setDisabled(True)
 
         # Set input validator
-        rx = QRegularExpression(r'^\d+\.?\d*$')
+        rx = QRegularExpression(r'^\d+\.?\d*$')  # float
         inputValidator = QRegularExpressionValidator(rx)
         self.periodLine.setValidator(inputValidator)
         self.startTime.setValidator(inputValidator)
@@ -256,7 +256,11 @@ class MainWindow(QMainWindow):
         # .csv files to C:\OpenField by default, thus predefined location
 
         # Create pandas dataframe and process it
-        self.csv_df = pd.read_csv(self.inputFileName, delimiter=';')
+        try:
+            self.csv_df = pd.read_csv(self.inputFileName, delimiter=';')
+        except FileNotFoundError:
+            return
+
         self.stat = DataProcessing(self.csv_df, self.params)
 
         # Update variables
@@ -874,8 +878,8 @@ class MainWindow(QMainWindow):
         # Adjust table width to contents
         self.table.setFixedWidth(self.tableWidth())
         # Adjust window width to table
-        app.processEvents()
-        self.adjustSize()
+        # app.processEvents()
+        # self.adjustSize()
 
         try:
             self.tableData = self.stat.table(self.zoneCoord, self.startSelected,
