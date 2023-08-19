@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import math as m
 import csv
+import inspect
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFileDialog, QToolTip,
@@ -13,7 +14,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QStyleFactory, QStyledItemDelegate
 )
-from PyQt6.QtCore import (Qt, QSize, pyqtSlot, QEvent,
+from PyQt6.QtCore import (Qt, QSize, pyqtSlot, QEvent, QPointF,
                           QVariantAnimation, QRegularExpression)
 from PyQt6.QtGui import (
     QFontMetrics, QIcon,
@@ -43,6 +44,7 @@ class MainWindow(QMainWindow):
         self.setLayouts()
 
     def setVariables(self):
+        print(inspect.currentframe().f_code.co_name)
 
         #TODO delete individual parameters to add global settings
         self.params = {'numLasers': 16,     # On one side
@@ -52,6 +54,7 @@ class MainWindow(QMainWindow):
                                             # rearings number, rearings time
         self.numLasers = self.params['numLasers']
         self.mapSide = self.params['mapSide']
+        self.cell = self.mapSide // self.numLasers
         # self.mapSide = min(self.height(), self.width()/2) * 2/3
         self.numStatParam = self.params['numStatParam']
         self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
@@ -277,9 +280,17 @@ class MainWindow(QMainWindow):
         clippedText = metrix.elidedText(self.inputFileName, Qt.ElideMiddle, width)
         self.fileNameLabel.setText(clippedText)
 
+        # Make path for visualization
+        self.pathPoints = []
+        for _, row in self.stat.data.iterrows():
+            x = int(row['x'] * self.cell - self.cell / 2)
+            y = int(row['y'] * self.cell - self.cell / 2)
+            self.pathPoints.append(QPointF(x, y))
+        self.pathPoints = np.array(self.pathPoints)
+
         # Update window
         self.setTimeRange()
-        self.drawPath(0, self.stat.data.index[-1])
+        # self.drawPath(0, self.stat.data.index[-1])
         self.fillTable()
         self.saveButton.setEnabled(True)
 
@@ -484,17 +495,17 @@ class MainWindow(QMainWindow):
         canvas = QPixmap(self.mapSide + 1, self.mapSide + 1)
         canvas.fill()
         painter = QPainter(canvas)
-        cell = int(self.mapSide / self.numLasers)
 
         # Draw grid
-        for i in range(0, self.numLasers + 1):
-            step = cell * i
+        #TODO add second loop for rectangle field
+        for i in range(self.numLasers + 1):
+            step = self.cell * i
             painter.drawLine(0, step, self.mapSide, step)
             painter.drawLine(step, 0, step, self.mapSide)
 
         painter.end()
         self.map.setPixmap(canvas)
-        return cell, canvas
+        return canvas
 
     def updateMap(self):
         start, end = [x/10 for x in self.timeRangeSlider.value()]
@@ -507,23 +518,12 @@ class MainWindow(QMainWindow):
         iEnd = self.stat.timeIndex(end)
         self.drawPath(iStart, iEnd)
 
-    #OPTIMIZE
     def drawPath(self, iStart, iEnd):
-        cell, canvas = self.drawMap()
+        print(inspect.currentframe().f_code.co_name)
+        canvas = self.drawMap()
         painter = QPainter(canvas)
         painter.setPen(QPen(Qt.red, 2))
-        lastX, lastY = 0, 0
-        for i, row in self.stat.data.iloc[iStart:iEnd, :].iterrows():
-            if not lastX:
-                lastX = int(row['x'] * cell - cell / 2)
-                lastY = int(row['y'] * cell - cell / 2)
-                continue
-            x = int(row['x'] * cell - cell / 2)
-            y = int(row['y'] * cell - cell / 2)
-            painter.drawLine(lastX, lastY, x, y)
-            lastX = x
-            lastY = y
-
+        painter.drawPolyline(self.pathPoints[iStart:iEnd])
         painter.end()
         self.map.setPixmap(canvas)
 
@@ -774,11 +774,9 @@ class MainWindow(QMainWindow):
         self.mapLayout.setSpacing(0)
         self.mapLayout.setContentsMargins(0, 0, 0, 0)
 
-        cell = int(self.mapSide / self.numLasers) # px
-
         for i in range(self.numLasers):
             self.mapButtons.append(QPushButton('', self.map))
-            self.mapButtons[i].setFixedSize(cell, self.mapSide)
+            self.mapButtons[i].setFixedSize(self.cell, self.mapSide)
             self.mapButtons[i].setCheckable(True)
             self.mapLayout.addWidget(self.mapButtons[i])
             self.mapButtons[i].clicked.connect(lambda checked, i=i:
@@ -795,11 +793,9 @@ class MainWindow(QMainWindow):
         self.mapLayout.setSpacing(0)
         self.mapLayout.setContentsMargins(0, 0, 0, 0)
 
-        cell = int(self.mapSide / self.numLasers) # px
-
         for i in range(self.numLasers):
             self.mapButtons.append(QPushButton('', self.map))
-            self.mapButtons[i].setFixedSize(self.mapSide, cell)
+            self.mapButtons[i].setFixedSize(self.mapSide, self.cell)
             self.mapButtons[i].setCheckable(True)
             self.mapLayout.addWidget(self.mapButtons[i])
             self.mapButtons[i].clicked.connect(lambda checked, i=i:
@@ -961,16 +957,16 @@ class MainWindow(QMainWindow):
                                            for zone in range(self.numZones+1)])
 
 class Delegate(QStyledItemDelegate):
-    def __init__ (self, parent, mywindow):
+    def __init__ (self, parent, window):
         super ().__init__ (parent)
-        self.mywindow = mywindow
+        self.window = window
 
     def paint(self, painter, option, index):
         super().paint(painter, option, index)
 
         # Overlap of colored zone and grey even block
         if index.column() != 0 and \
-           (index.row() // mywindow.numStatParam) % 2 == 1:
+           (index.row() // window.numStatParam) % 2 == 1:
             color = self.overlap(np.array([120, 120, 120, 120]),
                             np.array([*zoneColors[index.column()-1], 80]))
         # Colored zone
@@ -978,7 +974,7 @@ class Delegate(QStyledItemDelegate):
             color = (*zoneColors[index.column()-1], 80)
 
         # Grey even block
-        elif (index.row() // mywindow.numStatParam) % 2 == 1:
+        elif (index.row() // window.numStatParam) % 2 == 1:
                 color = (200, 200, 200, 120)
 
         try:
@@ -1002,6 +998,6 @@ class Delegate(QStyledItemDelegate):
 if __name__ == '__main__':
     app = QApplication(os.sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
-    mywindow = MainWindow()
-    mywindow.show()
+    window = MainWindow()
+    window.show()
     app.exec()
