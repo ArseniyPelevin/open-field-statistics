@@ -85,6 +85,7 @@ class MainWindow(QMainWindow):
 
 
     def setWidgets(self):
+        print(inspect.currentframe().f_code.co_name)
         self.getFileButton = QPushButton('Select file')
         self.getFileButton.setFixedWidth(80)
         self.fileNameLabel = QLabel()
@@ -131,6 +132,7 @@ class MainWindow(QMainWindow):
         self.setTable()
 
     def setTable(self):
+        print(inspect.currentframe().f_code.co_name)
         self.table = QTableWidget(self.numStatParam, 1)
 
         # Forbid user to touch anything in the table
@@ -183,6 +185,7 @@ class MainWindow(QMainWindow):
         self.adjustSize()
 
     def setSignals(self):
+        print(inspect.currentframe().f_code.co_name)
         self.getFileButton.clicked.connect(self.getFile)
         self.addZoneBtn.clicked.connect(self.addNewZone)
         self.saveButton.clicked.connect(self.saveData)
@@ -207,6 +210,7 @@ class MainWindow(QMainWindow):
         self.timeRangeSlider.sliderReleased.connect(self.sliderUpdateTimeRange)
 
     def setLayouts(self):
+        print(inspect.currentframe().f_code.co_name)
         timeRangeLayout = QGridLayout()
         timeRangeLayout.addWidget(self.startTime, 0, 0, Qt.AlignLeft)
         timeRangeLayout.addWidget(self.selectedTimeLabel, 0, 1, Qt.AlignCenter)
@@ -249,6 +253,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
     def getFile(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Load raw data file, get statistics, update map and table'''
         #TODO Remember file location
         self.inputFileName, _filter = QFileDialog.getOpenFileName(self,
@@ -295,6 +300,7 @@ class MainWindow(QMainWindow):
         self.saveButton.setEnabled(True)
 
     def selectedStatistics(self, start, end):
+        print(inspect.currentframe().f_code.co_name)
         '''
         User can selected a time range within recording time to analyze.
         All statistics will be shown for this range,
@@ -327,6 +333,7 @@ class MainWindow(QMainWindow):
         self.drawPath(iStart, iEnd)
 
     def setTimeRange(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Set selected time range based on loaded raw data'''
 
         sliderStep = 0.1   # Step of selected time range slider in seconds
@@ -342,6 +349,7 @@ class MainWindow(QMainWindow):
         self.endTime.setText(str(self.stat.totalTime))
 
     def updatePeriod(self, period=0, isUsersPeriod=False):
+        print(inspect.currentframe().f_code.co_name)
         '''
         Selected time is split to periods of user-defined length in seconds.
         Statistics for each period (and in each zone) is shown in the table.
@@ -384,6 +392,7 @@ class MainWindow(QMainWindow):
         self.fillTable()
 
     def sliderUpdateTimeRange(self):
+        print(inspect.currentframe().f_code.co_name)
         start, end = [x/10 for x in self.timeRangeSlider.value()]
 
         # Update values in text editors based on slider
@@ -393,12 +402,14 @@ class MainWindow(QMainWindow):
         self.selectedStatistics(start, end)
 
     def textUpdateTimeRange(self, start, end):
+        print(inspect.currentframe().f_code.co_name)
 
         # Update slider values based on text editors
         self.timeRangeSlider.setValue([start*10, end*10])
         self.selectedStatistics(start, end)
 
     def errorWarning(self, widget, errorMessage=''):
+        print(inspect.currentframe().f_code.co_name)
         ''' Flash red in the field with an error '''
 
         def updateColor(w):
@@ -431,6 +442,7 @@ class MainWindow(QMainWindow):
         QToolTip.showText(self.mapToGlobal(widget.pos()), errorMessage, widget)
 
     def checkPeriodValue(self):
+        print(inspect.currentframe().f_code.co_name)
         try:
             period = float(self.periodLine.text())
         # Empty line was entered
@@ -446,6 +458,7 @@ class MainWindow(QMainWindow):
         self.updatePeriod(period, isUsersPeriod=True)
 
     def checkStartTimeValue(self):
+        print(inspect.currentframe().f_code.co_name)
         try:
             start = float(self.startTime.text())
         # Empty line was entered as start time, set start to 0
@@ -465,6 +478,7 @@ class MainWindow(QMainWindow):
         self.textUpdateTimeRange(start, self.endSelected)
 
     def checkEndTimeValue(self):
+        print(inspect.currentframe().f_code.co_name)
         try:
             end = float(self.endTime.text())
         # Empty line was entered as end time, set end to max total time
@@ -492,6 +506,7 @@ class MainWindow(QMainWindow):
         self.textUpdateTimeRange(self.startSelected, end)
 
     def drawMap(self):
+        print(inspect.currentframe().f_code.co_name)
         canvas = QPixmap(self.mapSide + 1, self.mapSide + 1)
         canvas.fill()
         painter = QPainter(canvas)
@@ -508,6 +523,7 @@ class MainWindow(QMainWindow):
         return canvas
 
     def updateMap(self):
+        print(inspect.currentframe().f_code.co_name)
         start, end = [x/10 for x in self.timeRangeSlider.value()]
 
         # Update values in text editors based on slider
@@ -527,7 +543,8 @@ class MainWindow(QMainWindow):
         painter.end()
         self.map.setPixmap(canvas)
 
-    def newAreaBtn(self, newBtn):
+    def addNewAreaBtn(self, newBtn):
+        print(inspect.currentframe().f_code.co_name)
         '''
         Actions when an area type button is checked or unchecked.
 
@@ -589,6 +606,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def addNewZone(self, fillTable=True, numNewZones=1):
+        print(inspect.currentframe().f_code.co_name)
         '''
         Add a new zone to map and table from two sources:
             - user-defined area with map buttons:
@@ -623,7 +641,8 @@ class MainWindow(QMainWindow):
             self.fillTable()
         # self.adjustSize()
 
-    def mapBtnChecked(self, x=-1, y=-1, s=-1):
+    def mapBtnChecked(self, checked, x=-1, y=-1, s=-1):
+        print(inspect.currentframe().f_code.co_name)
         '''
         Actions when a map button was checked (add area for a new zone).
 
@@ -634,7 +653,7 @@ class MainWindow(QMainWindow):
         if self.numZones == 4:
             return
 
-        # Allow to add a new zone after some area was selected
+        # Allow to add a new zone after some area was selected #???
         self.addZoneBtn.setEnabled(True)
 
         # Depending on the area type, self.mapButtons (list of map buttons)
@@ -687,6 +706,7 @@ class MainWindow(QMainWindow):
                                                       self.mapBtnChecked(x=i, y=j))
 
     def vHalfArea(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Split box vertically into two halves'''
 
         self.newAreaBtn('Vertical_halves')
@@ -696,7 +716,6 @@ class MainWindow(QMainWindow):
         self.mapLayout = QHBoxLayout(self.map)
         self.mapLayout.setSpacing(0)
         self.mapLayout.setContentsMargins(0, 0, 0, 0)
-
         n = self.numLasers
         self.zoneCoord[:, :n//2] = 1
         self.zoneCoord[:, n//2:] = 2
@@ -711,6 +730,7 @@ class MainWindow(QMainWindow):
         self.fillTable()
 
     def hHalfArea(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Split box horizontally into two halves'''
 
         self.newAreaBtn('Horizontal_halves')
@@ -735,6 +755,7 @@ class MainWindow(QMainWindow):
         self.fillTable()
 
     def wallArea(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Split box into central and peripheral zones'''
 
         self.newAreaBtn('Wall')
@@ -764,6 +785,7 @@ class MainWindow(QMainWindow):
         self.fillTable()
 
     def columnMapButtons(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Map buttons are vertical columns'''
 
         self.newAreaBtn('Column')
@@ -783,6 +805,7 @@ class MainWindow(QMainWindow):
                                                   self.mapBtnChecked(y=i))
 
     def rowMapButtons(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Map buttons are horizontal rows'''
 
         self.newAreaBtn('Row')
@@ -802,6 +825,7 @@ class MainWindow(QMainWindow):
                                                   self.mapBtnChecked(x=i))
 
     def squareMapButtons(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Map buttons are concentric squares'''
 
         self.newAreaBtn('Square')
@@ -817,7 +841,7 @@ class MainWindow(QMainWindow):
             self.mapButtons[i].setFixedSize(self.mapSide, self.mapSide)
             self.mapButtons[i].setCheckable(True)
 
-#TODO Add sys._MEIPASS here to package into one file
+            #TODO Add sys._MEIPASS here to package into one file
             pixmap = QPixmap(os.path.join('Area_pixmaps', f'{i+1}.png'))
             self.mapButtons[i].setMask(pixmap.scaled(self.mapButtons[i].size(),
                                                     Qt.IgnoreAspectRatio).mask())
@@ -826,6 +850,7 @@ class MainWindow(QMainWindow):
                                                   self.mapBtnChecked(s=i))
 
     def areaButtons(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Area types buttons, arranged vertically to the left of the map'''
 
         self.areaButtonLayout = QVBoxLayout()
@@ -852,6 +877,7 @@ class MainWindow(QMainWindow):
         # self.areaButtonLayout.setContentsMargins(0, 0, 30, 0)
 
     def tableWidth(self):
+        print(inspect.currentframe().f_code.co_name)
         app.processEvents()
         app.processEvents()
         tableWidth = self.table.verticalHeader().width() + \
@@ -863,12 +889,14 @@ class MainWindow(QMainWindow):
         return tableWidth
 
     def tableHeight(self):
+        print(inspect.currentframe().f_code.co_name)
         tableHeight = self.table.verticalHeader().length() + \
                       self.table.horizontalHeader().height() + \
                       self.table.frameWidth() * 2
         return tableHeight
 
     def fillTable(self):
+        print(inspect.currentframe().f_code.co_name)
         '''Fill table with statistics'''
 
         # Adjust table width to contents
@@ -914,7 +942,10 @@ class MainWindow(QMainWindow):
                         item = QTableWidgetItem(str(val))
                         self.table.setItem(n*(per+s) + k, zone, item)
 
+        self.updateMap()
+
     def saveData(self):
+        print(inspect.currentframe().f_code.co_name)
         self.outputFile, _filter = QFileDialog.getSaveFileName(self, 'Save statistics',
                           os.path.splitext(self.inputFileName)[0]+'_statistics.csv')
         with open(self.outputFile, 'w+', newline='') as output:
