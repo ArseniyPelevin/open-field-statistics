@@ -12,10 +12,11 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QButtonGroup, QSpacerItem,
     QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStyleFactory, QStyledItemDelegate, QWidgetItem
+    QStyleFactory
 )
-from PyQt6.QtCore import (Qt, QSize, pyqtSlot, QEvent, QPointF,
-                          QVariantAnimation, QRegularExpression)
+from PyQt6.QtCore import (
+    Qt, QSize, pyqtSlot, QEvent, QPointF, QVariantAnimation, QRegularExpression
+    )
 from PyQt6.QtGui import (
     QFontMetrics, QIcon,
     QPen, QPixmap, QPainter, QColor, QPalette, QRegularExpressionValidator
@@ -25,7 +26,7 @@ from superqt import QRangeSlider
 
 from OpenFieldDataProcessing import DataProcessing
 #TODO Expand zoneCoolors to allow more zones
-from MapButtonStyleSheet import styleSheet, zoneColors# , color
+from MapButtonStyleSheet import Colors, Delegate
 
 
 class MainWindow(QMainWindow):
@@ -540,7 +541,7 @@ class MainWindow(QMainWindow):
 
         self.updateMap()
 
-        self.map.setStyleSheet(styleSheet(self.numZones))
+        self.map.setStyleSheet(Colors.styleSheet(self.numZones))
 
     def updateMap(self):
         print(inspect.currentframe().f_code.co_name)
@@ -570,7 +571,7 @@ class MainWindow(QMainWindow):
         for i in range(self.numLasers):
             for j in range(self.numLasers):
                 zone = self.zoneCoord[i][j]
-                zoneColor = QColor(*zoneColors[zone], int(0.3*255))
+                zoneColor = QColor(*Colors.zoneColors[zone], int(0.3*255))
                 zonePainter.setBrush(zoneColor)
                 x = self.cell * j
                 y = self.cell * i
@@ -674,7 +675,7 @@ class MainWindow(QMainWindow):
                 button.setChecked(False)
                 button.blockSignals(False)
 
-        self.map.setStyleSheet(styleSheet(self.numZones))
+        self.map.setStyleSheet(Colors.styleSheet(self.numZones))
         # self.adjustSize()
 
     def fillPredefinedZones(self, newBtn):
@@ -1019,45 +1020,6 @@ class MainWindow(QMainWindow):
                                          f'{self.verticalHeaders[k]}']
                                         + [round(self.tableData[per+1][zone][key], 1)
                                            for zone in range(self.numZones+1)])
-
-class Delegate(QStyledItemDelegate):
-    def __init__ (self, parent, window):
-        super ().__init__ (parent)
-        self.window = window
-
-    def paint(self, painter, option, index):
-        super().paint(painter, option, index)
-
-        # Overlap of colored zone and gray even block
-        if index.column() != 0 and \
-           (index.row() // window.numStatParam) % 2 == 1:
-            color = self.overlap(np.array([120, 120, 120, 120]),  # gray
-                                 np.array([*zoneColors[index.column()], 80]))
-        # Colored zone
-        elif index.column() != 0:
-            color = (*zoneColors[index.column()], 80)
-
-        # Gray even block
-        elif (index.row() // window.numStatParam) % 2 == 1:
-                color = (200, 200, 200, 120)
-
-        try:
-            index.model().setData(index, QColor(*color),
-                                  Qt.BackgroundColorRole)
-            option.palette.setColor(QPalette.Base,
-                                    index.data(Qt.BackgroundColorRole))
-        except UnboundLocalError:  # A white cell, no color was set
-            pass
-
-    def overlap(self, bg, fg):
-        bga = bg[3] / 255
-        fga = fg[3] / 255
-        bg = bg[:3] / 255
-        fg = fg[:3] / 255
-        a = 1 - (1 - bga) * (1 - fga)
-        color = fg * fga / a + bg * bga * (1 - fga) / a
-        return map(int, [*(color * 255), a * 255])
-
 
 if __name__ == '__main__':
     app = QApplication(os.sys.argv)
