@@ -206,7 +206,7 @@ class MainWindow(QMainWindow):
         self.endTime.editingFinished.connect(self.checkEndTimeValue)
 
         # Update time range from slider
-        self.timeRangeSlider.sliderMoved.connect(self.updateMapPath)
+        self.timeRangeSlider.sliderMoved.connect(self.sliderUpdateMapPath)
         self.timeRangeSlider.sliderReleased.connect(self.sliderUpdateTimeRange)
 
     def setLayouts(self):
@@ -570,16 +570,6 @@ class MainWindow(QMainWindow):
     def updateMapPath(self, iStart, iEnd):
         print(inspect.currentframe().f_code.co_name)
 
-        start, end = [x/10 for x in self.timeRangeSlider.value()]
-
-        # Update values in text editors based on slider
-        self.startTime.setText(str(start))
-        self.endTime.setText(str(end))
-
-        iStart = self.stat.timeIndex(start)
-        iEnd = self.stat.timeIndex(end)
-
-
         self.pathLayer.fill(Qt.transparent)
 
         pathPainter = QPainter(self.pathLayer)
@@ -590,6 +580,21 @@ class MainWindow(QMainWindow):
         pathPainter.end()
 
         self.updateMap()
+
+    def sliderUpdateMapPath(self):
+        print(inspect.currentframe().f_code.co_name)
+
+        start, end = [x/10 for x in self.timeRangeSlider.value()]
+
+        # Update values in text editors based on slider
+        self.startTime.setText(str(start))
+        self.endTime.setText(str(end))
+
+        iStart = self.stat.timeIndex(start)
+        iEnd = self.stat.timeIndex(end)
+
+        self.updateMapPath(iStart, iEnd)
+
 
     def newAreaButton(self, newBtnId, checked):
         print(inspect.currentframe().f_code.co_name)
