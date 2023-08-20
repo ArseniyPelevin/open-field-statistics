@@ -14,30 +14,10 @@ def styleSheet(zone):
         QPushButton:hover {{
             background-color: rgba({color[zone+1]}, 0.1);
         }}
-        '''
-        # QPushButton[zone0="true"] {{
-        #     background-color: rgba({color[0]}, 0.3);
-        # }}
 
-        # QPushButton[zone1="true"] {{
-        #     background-color: rgba({color[1]}, 0.3);
-        # }}
-
-        # QPushButton[zone2="true"] {{
-        #     background-color: rgba({color[2]}, 0.3);
-        # }}
-
-        # QPushButton[zone3="true"] {{
-        #     background-color: rgba({color[3]}, 0.3);
-        # }}
-        + f'''
         QPushButton:pressed {{
             background-color: rgba({color[zone+1]}, 0.3);
         }}
         ''')
 
-        # QPushButton:checked {{
-        #     background-color: rgba({color[zone+1]}, 0.3);
-        # }}
-        # ''')
     return styleSheet
