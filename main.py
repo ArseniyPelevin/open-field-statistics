@@ -9,10 +9,10 @@ import inspect
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFileDialog, QToolTip,
-    QLabel, QLineEdit, QPushButton, QSpacerItem,
-    QVBoxLayout, QHBoxLayout, QGridLayout,
+    QLabel, QLineEdit, QPushButton, QButtonGroup, QSpacerItem,
+    QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStyleFactory, QStyledItemDelegate
+    QStyleFactory, QStyledItemDelegate, QWidgetItem
 )
 from PyQt6.QtCore import (Qt, QSize, pyqtSlot, QEvent, QPointF,
                           QVariantAnimation, QRegularExpression)
@@ -25,7 +25,7 @@ from superqt import QRangeSlider
 
 from OpenFieldDataProcessing import DataProcessing
 #TODO Expand zoneCoolors to allow more zones
-from MapButtonStyleSheet import styleSheet, zoneColors, color
+from MapButtonStyleSheet import styleSheet, zoneColors# , color
 
 
 class MainWindow(QMainWindow):
@@ -59,8 +59,7 @@ class MainWindow(QMainWindow):
         self.numStatParam = self.params['numStatParam']
         self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
 
-        #???
-        self.zoneCoord = np.ones((self.numLasers, self.numLasers))
+        self.zoneCoord = np.zeros((self.numLasers, self.numLasers), dtype=int)
         self.numZones = 0
 
         self.verticalHeaders = ['Time (s)', 'Distance (cm)', 'Velocity (cm/s)',
@@ -125,8 +124,8 @@ class MainWindow(QMainWindow):
         self.startTime.setValidator(inputValidator)
         self.endTime.setValidator(inputValidator)
 
-        self.areaButtons()
         self.map = QLabel()
+        self.areaButtons()
         # self.map.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.drawMap()
         self.setTable()
@@ -172,7 +171,7 @@ class MainWindow(QMainWindow):
                                     border-left: 1px solid black;
                                 }
 
-                                QHeaderView::background-color:grey {
+                                QHeaderView::background-color:gray {
                                     background-color: 200, 200, 200, 0,5;
                                 }
 
@@ -190,14 +189,15 @@ class MainWindow(QMainWindow):
         self.addZoneBtn.clicked.connect(self.addNewZone)
         self.saveButton.clicked.connect(self.saveData)
 
-        self.areaBtn['Cell'].toggled.connect(self.cellMapButtons)
-        self.areaBtn['Vertical_halves'].toggled.connect(self.vHalfArea)
-        self.areaBtn['Horizontal_halves'].toggled.connect(self.hHalfArea)
-        self.areaBtn['Wall'].toggled.connect(self.wallArea)
-        self.areaBtn['Column'].toggled.connect(self.columnMapButtons)
-        self.areaBtn['Row'].toggled.connect(self.rowMapButtons)
-        self.areaBtn['Square'].toggled.connect(self.squareMapButtons)
+        # self.areaBtn[self.areaBtnIdx['Vertical_halves']].toggled.connect(self.vHalfArea)
+        # self.areaBtn[self.areaBtnIdx['Horizontal_halves']].toggled.connect(self.hHalfArea)
+        # self.areaBtn[self.areaBtnIdx['Wall']].toggled.connect(self.wallArea)
 
+        # self.areaBtn[self.areaBtnIdx['Cell']].toggled.connect(self.cellMapButtons)
+        # self.areaBtn[self.areaBtnIdx['Column']].toggled.connect(self.columnMapButtons)
+        # self.areaBtn[self.areaBtnIdx['Row']].toggled.connect(self.rowMapButtons)
+        # self.areaBtn[self.areaBtnIdx['Square']].toggled.connect(self.squareMapButtons)
+        self.areaBtnGroup.idToggled.connect(self.newAreaButton)
         # Update period
         self.periodLine.editingFinished.connect(self.checkPeriodValue)
 
@@ -206,7 +206,7 @@ class MainWindow(QMainWindow):
         self.endTime.editingFinished.connect(self.checkEndTimeValue)
 
         # Update time range from slider
-        self.timeRangeSlider.sliderMoved.connect(self.updateMap)
+        self.timeRangeSlider.sliderMoved.connect(self.updateMapPath)
         self.timeRangeSlider.sliderReleased.connect(self.sliderUpdateTimeRange)
 
     def setLayouts(self):
@@ -226,7 +226,7 @@ class MainWindow(QMainWindow):
         self.controlLayout.addWidget(self.getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.fileNameLabel, 0, 1, 1, 2)
         self.controlLayout.addWidget(self.addZoneBtn, 1, 0, 1, 2, Qt.AlignRight)
-        self.controlLayout.addLayout(self.areaButtonLayout, 2, 0, 1, 1, Qt.AlignLeft)
+        self.controlLayout.addLayout(self.areaBtnLayout, 2, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.map, 2, 1, 1, 1, Qt.AlignLeft)
         self.controlLayout.addLayout(periodLayout, 4, 0, 1, 2,
                                      (Qt.AlignRight | Qt.AlignBottom))
@@ -295,7 +295,7 @@ class MainWindow(QMainWindow):
 
         # Update window
         self.setTimeRange()
-        # self.drawPath(0, self.stat.data.index[-1])
+        self.updateMapPath(0, self.stat.data.index[-1])
         self.fillTable()
         self.saveButton.setEnabled(True)
 
@@ -330,7 +330,7 @@ class MainWindow(QMainWindow):
         self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
         self.updatePeriod()
 
-        self.drawPath(iStart, iEnd)
+        self.updateMapPath(iStart, iEnd)
 
     def setTimeRange(self):
         print(inspect.currentframe().f_code.co_name)
@@ -507,23 +507,69 @@ class MainWindow(QMainWindow):
 
     def drawMap(self):
         print(inspect.currentframe().f_code.co_name)
-        canvas = QPixmap(self.mapSide + 1, self.mapSide + 1)
-        canvas.fill()
-        painter = QPainter(canvas)
+
+        self.mapCanvas = QPixmap(self.mapSide + 1, self.mapSide + 1)
+
+        self.gridLayer = QPixmap(self.mapSide + 1, self.mapSide + 1)
+        self.zoneLayer = QPixmap(self.mapSide + 1, self.mapSide + 1)
+        self.pathLayer = QPixmap(self.mapSide + 1, self.mapSide + 1)
+
+        self.gridLayer.fill()
+        self.zoneLayer.fill(Qt.transparent)
+        self.pathLayer.fill(Qt.transparent)
+
+        gridPainter = QPainter(self.gridLayer)
 
         # Draw grid
-        #TODO add second loop for rectangle field
-        for i in range(self.numLasers + 1):
+        for i in range(self.numLasers + 1): #TODO add second loop for rectangle field
             step = self.cell * i
-            painter.drawLine(0, step, self.mapSide, step)
-            painter.drawLine(step, 0, step, self.mapSide)
+            gridPainter.drawLine(0, step, self.mapSide, step)
+            gridPainter.drawLine(step, 0, step, self.mapSide)
 
-        painter.end()
-        self.map.setPixmap(canvas)
-        return canvas
+        gridPainter.end()
+
+        self.updateMap()
+
+        self.map.setStyleSheet(styleSheet(self.numZones))
 
     def updateMap(self):
         print(inspect.currentframe().f_code.co_name)
+
+        mapPainter = QPainter(self.mapCanvas)
+
+        mapPainter.drawPixmap(0, 0, self.gridLayer)
+        mapPainter.drawPixmap(0, 0, self.zoneLayer)
+        mapPainter.drawPixmap(0, 0, self.pathLayer)
+
+        mapPainter.end()
+
+        self.map.setPixmap(self.mapCanvas)
+
+    def updateMapZones(self):
+        print(inspect.currentframe().f_code.co_name)
+
+        self.zoneLayer.fill(Qt.transparent)
+
+        zonePainter = QPainter(self.zoneLayer)
+
+        print(self.zoneCoord)
+        # Fill cells with color
+        for i in range(self.numLasers):
+            for j in range(self.numLasers):
+                zone = self.zoneCoord[i][j]
+                zoneColor = QColor(*zoneColors[zone], int(0.3*255))
+                zonePainter.setBrush(zoneColor)
+                x = self.cell * j
+                y = self.cell * i
+                zonePainter.drawRect(x, y, self.cell, self.cell)
+
+        zonePainter.end()
+
+        self.updateMap()
+
+    def updateMapPath(self, iStart, iEnd):
+        print(inspect.currentframe().f_code.co_name)
+
         start, end = [x/10 for x in self.timeRangeSlider.value()]
 
         # Update values in text editors based on slider
@@ -532,19 +578,26 @@ class MainWindow(QMainWindow):
 
         iStart = self.stat.timeIndex(start)
         iEnd = self.stat.timeIndex(end)
-        self.drawPath(iStart, iEnd)
 
-    def drawPath(self, iStart, iEnd):
-        print(inspect.currentframe().f_code.co_name)
-        canvas = self.drawMap()
-        painter = QPainter(canvas)
-        painter.setPen(QPen(Qt.red, 2))
-        painter.drawPolyline(self.pathPoints[iStart:iEnd])
-        painter.end()
-        self.map.setPixmap(canvas)
 
-    def addNewAreaBtn(self, newBtn):
+        self.pathLayer.fill(Qt.transparent)
+
+        pathPainter = QPainter(self.pathLayer)
+
+        pathPainter.setPen(QPen(Qt.red, 2))
+        pathPainter.drawPolyline(self.pathPoints[iStart:iEnd])
+
+        pathPainter.end()
+
+        self.updateMap()
+
+    def newAreaButton(self, newBtnId, checked):
         print(inspect.currentframe().f_code.co_name)
+
+        self.mapLayout.setCurrentIndex(newBtnId)
+
+    # def addNewAreaBtn(self, newBtn):
+        # print(f'start {inspect.currentframe().f_code.co_name}')
         '''
         Actions when an area type button is checked or unchecked.
 
@@ -562,47 +615,82 @@ class MainWindow(QMainWindow):
         '''
 
         # List of area types allowing for multiple zone selection
-        multiZone = list(map(self.areaBtnNames.__getitem__, [0, 4, 5, 6]))
+        # multiZone = list(map(self.areaBtnGroup.__getitem__, ['Cell', 'Column',
+        #                                                 'Row', 'Square']))
 
-        if self.areaBtn[newBtn].isChecked():
-            self.checkedAreaBtn = newBtn
-            # Define new empty list for map buttons
-            self.mapButtons = []
-            self.zoneCoord = np.zeros((self.numLasers, self.numLasers))
-            if newBtn not in multiZone:
-            # There will be only 2 zones
-                self.addNewZone(fillTable=False, numNewZones=2)
-                # Do not fill table now.
-                # It will be updated from specific area type function,
-                # after zoneCoord is updated.
+        # If new area type was selected without unchecking the old one
+        # for btn in self.areaBtnGroup.values():
+        #     if btn != newBtn and btn.isChecked():
+        #         btn.setChecked(False)
 
-            # Disable all other area type buttons except for the checked one
-            [self.areaBtn[key].setDisabled(True) for key in self.areaBtnNames \
-                                                         if key != newBtn]
+        # self.checkedAreaBtn = newBtn
+        # Define new empty list for map buttons
+        # self.mapButtons = []
+        # There will be only 2 zones:
 
-        else:  # Area type button is unchecked
-            # Delete old map buttons
-            for i in reversed(range(self.mapLayout.count())):
-                item = self.mapLayout.itemAt(i).widget()
-                item.deleteLater()
-            # Delete old map buttons' layout
-            self.mapLayout.deleteLater()
+        #!!!
+        '''
+        if newBtn not in multiZone:
+            self.zoneCoord = np.zeros((self.numLasers, self.numLasers), dtype=int)
+            self.addNewZone(fillTable=False, numNewZones=2)
+            # Do not fill table now.
+            # It will be updated from specific area type function,
+            # after zoneCoord is updated.
 
-            self.checkedAreaBtn = None
-            self.addZoneBtn.setDisabled(True)
+        # Disable all other area type buttons except for the checked one
+        # [self.areaBtn[key].setDisabled(True) for key in self.areaBtnNames \
+        #                                               if key != newBtn]
+        self.map.setStyleSheet(styleSheet(self.numZones))
+        '''
+        #!!!
 
-            # Enable all area buttons
-            [self.areaBtn[name].setEnabled(True) for name in self.areaBtn]
+        # print(f'end {inspect.currentframe().f_code.co_name}')
 
-            self.table.setColumnCount(1)
-            self.numZones = 0
-            self.zoneCoord = np.ones((self.numLasers, self.numLasers))
-            self.fillTable()
-            self.table.setFixedWidth(self.tableWidth())
-            delattr(self, 'mapLayout')
+    # def clearMapButtons(self):
+    #     print(f'start {inspect.currentframe().f_code.co_name}')
+
+    #     # Delete old map buttons
+    #     #for i in reversed(range(self.mapLayout.count())):
+    #     # while self.mapLayout.count():
+    #     #     item = self.mapLayout.takeAt(0).widget()
+    #     #     item.deleteLater()
+    #     # # Delete old map buttons' layout
+    #     # self.mapLayout.deleteLater()
+
+
+    #     def clearLayout(layout):
+    #         if layout is not None:
+    #             while layout.count():
+    #                 item = layout.takeAt(0)
+    #                 widget = item.widget()
+    #                 if widget is not None:
+    #                     widget.deleteLater()
+    #                 else:
+    #                     self.clearLayout(item.layout())
+
+    #         layout.deleteLater()
+    #     app.processEvents()
+    #     app.processEvents()
+    #     clearLayout(self.mapLayout)
+
+
+        # self.checkedAreaBtn = None
+        # self.addZoneBtn.setDisabled(True)
+
+        # Enable all area buttons
+        # [self.areaBtn[name].setEnabled(True) for name in self.areaBtn]
+
+        # self.table.setColumnCount(1)
+        # self.numZones = 0
+        # self.zoneCoord = np.zeros((self.numLasers, self.numLasers), dtype=int)
+        # self.fillTable()
+        # self.table.setFixedWidth(self.tableWidth())
+        # delattr(self, 'mapLayout')
 
         # Set style sheet for all map buttons
-        self.map.setStyleSheet(styleSheet(self.numZones))
+        # self.map.setStyleSheet(styleSheet(self.numZones))
+
+        # print(f'end {inspect.currentframe().f_code.co_name}')
 
     @pyqtSlot()
     def addNewZone(self, fillTable=True, numNewZones=1):
@@ -632,14 +720,29 @@ class MainWindow(QMainWindow):
             # self.adjustSize()
 
             # Show the new zone on map with a new color
-            self.map.setStyleSheet(styleSheet(self.numZones))
+        # self.map.setStyleSheet(styleSheet(self.numZones))
 
         # Do not allow to add empty zone before a new area is selected
         self.addZoneBtn.setDisabled(True)
 
         if fillTable:
             self.fillTable()
+
+        # # Loop through all map buttons in all map layouts and uncheck them
+        for i in range(self.mapLayout.count()):
+            layout = self.mapLayout.widget(i).layout()
+            for i in range(layout.count()):
+                # Uncheck the button
+                button = layout.itemAt(i).widget()
+                button.blockSignals(True)
+                button.setChecked(False)
+                button.blockSignals(False)
+
+        self.map.setStyleSheet(styleSheet(self.numZones))
         # self.adjustSize()
+
+    def fillPredefinedZones(self, newBtnId):
+        pass
 
     def mapBtnChecked(self, checked, x=-1, y=-1, s=-1):
         print(inspect.currentframe().f_code.co_name)
@@ -656,101 +759,92 @@ class MainWindow(QMainWindow):
         # Allow to add a new zone after some area was selected #???
         self.addZoneBtn.setEnabled(True)
 
+        if checked:
+            zoneValue = self.numZones + 1
+        else:
+            zoneValue = 0
+
         # Depending on the area type, self.mapButtons (list of map buttons)
         # has different shape and indexing:
         if s != -1:     # Square map button
-            self.zoneCoord[[s, -s-1], s:self.numLasers-s] = self.numZones + 1
-            self.zoneCoord[s:self.numLasers-s, [s, -s-1]] = self.numZones + 1
-            self.mapButtons[(coord:=s)].setDisabled(True)
+            self.zoneCoord[[s, -s-1], s:self.numLasers-s] = zoneValue
+            self.zoneCoord[s:self.numLasers-s, [s, -s-1]] = zoneValue
+            # coord = s
+            # self.mapButtons[(coord:=s)].setDisabled(True)
         elif y == -1:   # Row map button
-            self.zoneCoord[x,:] = self.numZones + 1
-            self.mapButtons[(coord:=x)].setDisabled(True)
+            self.zoneCoord[x,:] = zoneValue
+            # coord = x
+            # self.mapButtons[(coord:=x)].setDisabled(True)
         elif x == -1:   # Column map button
-            self.zoneCoord[:,y] = self.numZones + 1
-            self.mapButtons[(coord:=y)].setDisabled(True)
+            self.zoneCoord[:,y] = zoneValue
+            # coord = y
+            # self.mapButtons[(coord:=y)].setDisabled(True)
         else:           # Cell map button
-            self.zoneCoord[x][y] = self.numZones + 1
-            self.mapButtons[x][y].setDisabled(True)
-            self.mapButtons[x][y].setProperty(f'zone{self.numZones}', True)
-            self.map.setStyleSheet(styleSheet(self.numZones))
-            return
+            self.zoneCoord[x][y] = zoneValue
+            # self.mapButtons[x][y].setDisabled(True)
+            # self.mapButtons[x][y].setProperty(f'zone{self.numZones}', True)
+            # self.map.setStyleSheet(styleSheet(self.numZones))
 
         # Property of the button (the number of zone it belongs to)
         # defines its color according the style sheet
-        self.mapButtons[coord].setProperty(f'zone{self.numZones}', True)
+        # self.mapButtons[coord].setProperty(f'zone{self.numZones}', True)
 
         # Define color for this new area
-        self.map.setStyleSheet(styleSheet(self.numZones))
+        # self.map.setStyleSheet(styleSheet(self.numZones))
 
-    def cellMapButtons(self):
-        '''One cell map button, corresponds to one laser intersection'''
-
-        self.newAreaBtn('Cell')
-        if not self.areaBtn['Cell'].isChecked():
-            return
-
-        cell = int(self.mapSide / self.numLasers) # px
-
-        self.mapLayout = QGridLayout(self.map)
-        self.mapLayout.setSpacing(0)
-        self.mapLayout.setContentsMargins(0, 0, 0, 0)
-
-        for i in range(self.numLasers):
-            self.mapButtons.append([])
-            for j in range(self.numLasers):
-                self.mapButtons[i].append(QPushButton('', self.map))
-                self.mapButtons[i][j].setFixedSize(cell, cell)
-                self.mapButtons[i][j].setCheckable(True)
-                self.mapLayout.addWidget(self.mapButtons[i][j], i, j)
-                self.mapButtons[i][j].clicked.connect(lambda checked, i=i, j=j:
-                                                      self.mapBtnChecked(x=i, y=j))
+        self.updateMapZones()
 
     def vHalfArea(self):
         print(inspect.currentframe().f_code.co_name)
         '''Split box vertically into two halves'''
 
-        self.newAreaBtn('Vertical_halves')
-        if not self.areaBtn['Vertical_halves'].isChecked():
-            return
+        # button = self.sender()
+        # if button.isChecked():
+        #     self.addNewAreaBtn(button)
+        # else:
+        #     self.clearMapButtons()
+        #     return
 
-        self.mapLayout = QHBoxLayout(self.map)
-        self.mapLayout.setSpacing(0)
-        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        # self.mapLayout = QHBoxLayout(self.map)
+        # self.mapLayout.setSpacing(0)
+        # self.mapLayout.setContentsMargins(0, 0, 0, 0)
         n = self.numLasers
         self.zoneCoord[:, :n//2] = 1
         self.zoneCoord[:, n//2:] = 2
 
-        halves = [QPushButton(), QPushButton()]
-        for half in halves:
-            half.setFixedSize(int(self.mapSide / 2), self.mapSide)
-            self.mapLayout.addWidget(half)
-        halves[0].setStyleSheet(f'background-color: rgba({color[0]}, 0.3)')
-        halves[1].setStyleSheet(f'background-color: rgba({color[1]}, 0.3)')
-
+        # halves = [QPushButton(), QPushButton()]
+        # for half in halves:
+        #     half.setFixedSize(int(self.mapSide / 2), self.mapSide)
+        #     self.mapLayout.addWidget(half)
+        # halves[0].setStyleSheet(f'background-color: rgba({color[0]}, 0.3)')
+        # halves[1].setStyleSheet(f'background-color: rgba({color[1]}, 0.3)')
         self.fillTable()
 
     def hHalfArea(self):
         print(inspect.currentframe().f_code.co_name)
         '''Split box horizontally into two halves'''
 
-        self.newAreaBtn('Horizontal_halves')
-        if not self.areaBtn['Horizontal_halves'].isChecked():
-            return
+        # button = self.sender()
+        # if button.isChecked():
+        #     self.addNewAreaBtn(button)
+        # else:
+        #     self.clearMapButtons()
+        #     return
 
-        self.mapLayout = QVBoxLayout(self.map)
-        self.mapLayout.setSpacing(0)
-        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        # self.mapLayout = QVBoxLayout(self.map)
+        # self.mapLayout.setSpacing(0)
+        # self.mapLayout.setContentsMargins(0, 0, 0, 0)
 
         n = self.numLasers
         self.zoneCoord[:n//2, :] = 1
         self.zoneCoord[n//2:, :] = 2
 
-        halves = [QPushButton(), QPushButton()]
-        for half in halves:
-            half.setFixedSize(self.mapSide, int(self.mapSide / 2))
-            self.mapLayout.addWidget(half)
-        halves[0].setStyleSheet(f'background-color: rgba({color[0]}, 0.3)')
-        halves[1].setStyleSheet(f'background-color: rgba({color[1]}, 0.3)')
+        # halves = [QPushButton(), QPushButton()]
+        # for half in halves:
+        #     half.setFixedSize(self.mapSide, int(self.mapSide / 2))
+        #     self.mapLayout.addWidget(half)
+        # halves[0].setStyleSheet(f'background-color: rgba({color[0]}, 0.3)')
+        # halves[1].setStyleSheet(f'background-color: rgba({color[1]}, 0.3)')
 
         self.fillTable()
 
@@ -758,123 +852,213 @@ class MainWindow(QMainWindow):
         print(inspect.currentframe().f_code.co_name)
         '''Split box into central and peripheral zones'''
 
-        self.newAreaBtn('Wall')
-        if not self.areaBtn['Wall'].isChecked():
-            return
+        # button = self.sender()
+        # if button.isChecked():
+        #     self.addNewAreaBtn(button)
+        # else:
+        #     self.clearMapButtons()
+        #     return
 
-        self.mapLayout = QGridLayout(self.map)
-        self.mapLayout.setSpacing(0)
-        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        # self.mapLayout = QGridLayout(self.map)
+        # self.mapLayout.setSpacing(0)
+        # self.mapLayout.setContentsMargins(0, 0, 0, 0)
 
         n = self.numLasers
-        self.zoneCoord = np.ones((n, n))
+        self.zoneCoord = np.zeros((n, n), dtype=int)
         self.zoneCoord[n//4 : 3*n//4, n//4 : 3*n//4] = 2
 
-        pixmap = QPixmap(os.path.join('Area_pixmaps', 'wall.png'))
-        outer = QPushButton()
-        outer.setFixedSize(self.mapSide, self.mapSide)
-        outer.setMask(pixmap.scaled(outer.size(), Qt.IgnoreAspectRatio).mask())
-        outer.setStyleSheet(f'background-color: rgba({color[0]}, 0.3)')
-        self.mapLayout.addWidget(outer, 0, 0)
+        # pixmap = QPixmap(os.path.join('Area_pixmaps', 'wall.png'))
+        # outer = QPushButton()
+        # outer.setFixedSize(self.mapSide, self.mapSide)
+        # outer.setMask(pixmap.scaled(outer.size(), Qt.IgnoreAspectRatio).mask())
+        # outer.setStyleSheet(f'background-color: rgba({color[0]}, 0.3)')
+        # self.mapLayout.addWidget(outer, 0, 0)
 
-        inner = outer = QPushButton()
-        inner.setFixedSize(int(self.mapSide / 2), int(self.mapSide / 2))
-        inner.setStyleSheet(f'background-color: rgba({color[1]}, 0.3)')
-        self.mapLayout.addWidget(inner, 0, 0, alignment = Qt.AlignCenter)
+        # inner = outer = QPushButton()
+        # inner.setFixedSize(int(self.mapSide / 2), int(self.mapSide / 2))
+        # inner.setStyleSheet(f'background-color: rgba({color[1]}, 0.3)')
+        # self.mapLayout.addWidget(inner, 0, 0, alignment = Qt.AlignCenter)
 
         self.fillTable()
+
+    def cellMapButtons(self):
+        print(inspect.currentframe().f_code.co_name)
+        '''One cell map button, corresponds to one laser intersection'''
+
+        # button = self.sender()
+        # if button.isChecked():
+        #     self.addNewAreaBtn(button)
+        # else:
+        #     self.clearMapButtons()
+        #     return
+
+        self.cellMap = QWidget(self.map)
+        self.cellMapLayout = QGridLayout(self.cellMap)
+        self.cellMapLayout.setSpacing(0)
+        self.cellMapLayout.setContentsMargins(0, 0, 0, 0)
+        self.cellMapButtons = []
+        # self.mapLayout.addWidget(self.cellMapLayout)
+
+        for i in range(self.numLasers):
+            self.cellMapButtons.append([])
+            for j in range(self.numLasers):
+                self.cellMapButtons[i].append(QPushButton('', self.map))
+                self.cellMapButtons[i][j].setFixedSize(self.cell, self.cell)
+                self.cellMapButtons[i][j].setCheckable(True)
+                self.cellMapLayout.addWidget(self.cellMapButtons[i][j], i, j)
+                self.cellMapButtons[i][j].toggled.connect(
+                    lambda checked, i=i, j=j:
+                        self.mapBtnChecked(checked=checked, x=i, y=j))
+
+        return self.cellMap
 
     def columnMapButtons(self):
         print(inspect.currentframe().f_code.co_name)
         '''Map buttons are vertical columns'''
 
-        self.newAreaBtn('Column')
-        if not self.areaBtn['Column'].isChecked():
-            return
+        # button = self.sender()
+        # if button.isChecked():
+        #     self.addNewAreaBtn(button)
+        # else:
+        #     self.clearMapButtons()
+        #     return
 
-        self.mapLayout = QHBoxLayout(self.map)
-        self.mapLayout.setSpacing(0)
-        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        self.columnMap = QWidget(self.map)
+        self.columnMapLayout = QHBoxLayout(self.columnMap)
+        self.columnMapLayout.setSpacing(0)
+        self.columnMapLayout.setContentsMargins(0, 0, 0, 0)
+        self.columnMapButtons = []
+        # self.mapLayout.addWidget(self.columnMapLayout)
 
         for i in range(self.numLasers):
-            self.mapButtons.append(QPushButton('', self.map))
-            self.mapButtons[i].setFixedSize(self.cell, self.mapSide)
-            self.mapButtons[i].setCheckable(True)
-            self.mapLayout.addWidget(self.mapButtons[i])
-            self.mapButtons[i].clicked.connect(lambda checked, i=i:
-                                                  self.mapBtnChecked(y=i))
+            self.columnMapButtons.append(QPushButton('', self.map))
+            self.columnMapButtons[i].setFixedSize(self.cell, self.mapSide)
+            self.columnMapButtons[i].setCheckable(True)
+            self.columnMapLayout.addWidget(self.columnMapButtons[i])
+            self.columnMapButtons[i].toggled.connect(
+                lambda checked, i=i:
+                    self.mapBtnChecked(checked=checked, y=i))
+
+        return self.columnMap
 
     def rowMapButtons(self):
         print(inspect.currentframe().f_code.co_name)
         '''Map buttons are horizontal rows'''
 
-        self.newAreaBtn('Row')
-        if not self.areaBtn['Row'].isChecked():
-            return
+        # button = self.sender()
+        # if button.isChecked():
+        #     self.addNewAreaBtn(button)
+        # else:
+        #     self.clearMapButtons()
+        #     return
 
-        self.mapLayout = QVBoxLayout(self.map)
-        self.mapLayout.setSpacing(0)
-        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        self.rowMap = QWidget(self.map)
+        self.rowMapLayout = QVBoxLayout(self.rowMap)
+        self.rowMapLayout.setSpacing(0)
+        self.rowMapLayout.setContentsMargins(0, 0, 0, 0)
+        self.rowMapButtons = []
+        # self.mapLayout.addWidget(self.rowMapLayout)
 
         for i in range(self.numLasers):
-            self.mapButtons.append(QPushButton('', self.map))
-            self.mapButtons[i].setFixedSize(self.mapSide, self.cell)
-            self.mapButtons[i].setCheckable(True)
-            self.mapLayout.addWidget(self.mapButtons[i])
-            self.mapButtons[i].clicked.connect(lambda checked, i=i:
-                                                  self.mapBtnChecked(x=i))
+            self.rowMapButtons.append(QPushButton('', self.map))
+            self.rowMapButtons[i].setFixedSize(self.mapSide, self.cell)
+            self.rowMapButtons[i].setCheckable(True)
+            self.rowMapLayout.addWidget(self.rowMapButtons[i])
+            self.rowMapButtons[i].toggled.connect(
+                lambda checked, i=i:
+                    self.mapBtnChecked(checked=checked, x=i))
+
+        return self.rowMap
 
     def squareMapButtons(self):
         print(inspect.currentframe().f_code.co_name)
         '''Map buttons are concentric squares'''
 
-        self.newAreaBtn('Square')
-        if not self.areaBtn['Square'].isChecked():
-            return
+        # button = self.sender()
+        # if button.isChecked():
+        #     self.addNewAreaBtn(button)
+        # else:
+        #     self.clearMapButtons()
+        #     return
 
-        self.mapLayout = QGridLayout(self.map)
-        self.mapLayout.setSpacing(0)
-        self.mapLayout.setContentsMargins(0, 0, 0, 0)
+        self.squareMap = QWidget(self.map)
+        self.squareMapLayout = QGridLayout(self.squareMap)
+        self.squareMapLayout.setSpacing(0)
+        self.squareMapLayout.setContentsMargins(0, 0, 0, 0)
+        self.squareMapButtons = []
+        # self.mapLayout.addWidget(self.squareMapLayout)
 
         for i in range(8):
-            self.mapButtons.append(QPushButton('', self.map))
-            self.mapButtons[i].setFixedSize(self.mapSide, self.mapSide)
-            self.mapButtons[i].setCheckable(True)
+            self.squareMapButtons.append(QPushButton('', self.map))
+            self.squareMapButtons[i].setFixedSize(self.mapSide, self.mapSide)
+            self.squareMapButtons[i].setCheckable(True)
 
             #TODO Add sys._MEIPASS here to package into one file
             pixmap = QPixmap(os.path.join('Area_pixmaps', f'{i+1}.png'))
-            self.mapButtons[i].setMask(pixmap.scaled(self.mapButtons[i].size(),
+            self.squareMapButtons[i].setMask(pixmap.scaled(self.squareMapButtons[i].size(),
                                                     Qt.IgnoreAspectRatio).mask())
-            self.mapLayout.addWidget(self.mapButtons[i], 0, 0)
-            self.mapButtons[i].clicked.connect(lambda checked, i=i:
-                                                  self.mapBtnChecked(s=i))
+            self.squareMapLayout.addWidget(self.squareMapButtons[i], 0, 0)
+            self.squareMapButtons[i].toggled.connect(
+                lambda checked, i=i:
+                    self.mapBtnChecked(checked=checked, s=i))
+
+        return self.squareMap
 
     def areaButtons(self):
         print(inspect.currentframe().f_code.co_name)
         '''Area types buttons, arranged vertically to the left of the map'''
 
-        self.areaButtonLayout = QVBoxLayout()
-        self.areaBtnNames = ['Cell', 'Vertical_halves', 'Horizontal_halves',
-                             'Wall', 'Column', 'Row', 'Square']
-        self.areaBtn = {}
-        numAreaBtn = 7
-        for i in range(numAreaBtn):
-            name = self.areaBtnNames[i]
-            self.areaBtn[name] = QPushButton()
 
-#TODO Add sys._MEIPASS here to package into one file
-            pixmap = QPixmap(os.path.join('Area_Buttons_pixmaps',
-                                  self.areaBtnNames[i] + '.png'))
+        customAreaBtn = ['Cell', 'Column', 'Row', 'Square']
+        predefinedAreaBtn = ['Vertical_halves', 'Horizontal_halves', 'Wall']
+        areaBtnMethodsList = [self.cellMapButtons, self.columnMapButtons,
+                                  self.rowMapButtons, self.squareMapButtons]
+                                 # self.vHalfArea, self.vHalfArea, self.wallArea]
+        # Make a bidirectional dict to index through QButtonGroup
+        self.areaBtnIdx = {}
+        areaBtnMethods = {}
+        for i, k in enumerate(customAreaBtn + predefinedAreaBtn):
+            self.areaBtnIdx.update({i: k}) #{k: i, i: k})
+            # areaBtnMethods.update({i: areaBtnMethodsList[i]})
 
-            self.areaBtn[name].setIcon(QIcon(pixmap))
-            self.areaBtn[name].setIconSize(QSize(30, 30))
-            self.areaBtn[name].setFixedSize(30, 30)
-            self.areaButtonLayout.addWidget(self.areaBtn[name])
-            self.areaBtn[name].setCheckable(True)
+        self.areaBtnGroup = QButtonGroup()
+        self.areaBtnLayout = QVBoxLayout()
+        self.mapLayout = QStackedLayout()
 
-        self.areaButtonLayout.setSpacing(int((self.mapSide - (30 * numAreaBtn)) /
-                                         (numAreaBtn - 1)))
-        # self.areaButtonLayout.setContentsMargins(0, 0, 30, 0)
+        # Create area buttons
+        numAreaBtn = len(self.areaBtnIdx)
+        size = int(self.mapSide / (numAreaBtn * 1.5))
+
+        for idx, name in self.areaBtnIdx.items():
+            # Make current button
+            # self.areaBtn[name] = QPushButton()
+            button = QPushButton()
+            self.areaBtnGroup.addButton(button, id=idx)
+
+            #TODO Add sys._MEIPASS here to package into one file
+            pixmap = QPixmap(os.path.join('Area_Buttons_pixmaps', f'{name}.png'))
+
+            # Set button's parameters
+            self.areaBtnGroup.button(idx).setIcon(QIcon(pixmap))
+            self.areaBtnGroup.button(idx).setIconSize(QSize(size, size))
+            self.areaBtnGroup.button(idx).setFixedSize(size, size)
+            self.areaBtnLayout.addWidget(self.areaBtnGroup.button(idx))
+            self.areaBtnGroup.button(idx).setCheckable(True)
+
+            if name in customAreaBtn:
+                areaMap = areaBtnMethodsList[idx]()
+                self.mapLayout.insertWidget(idx, areaMap)
+
+            # Cell is the default area type
+            if name == 'Cell':
+                self.areaBtnGroup.button(idx).setChecked(True)
+
+        self.areaBtnLayout.setSpacing(size // 2)
+        self.areaBtnLayout.insertSpacing(4, size // 2)
+
+
+
+        # self.areaBtnLayout.setContentsMargins(0, 0, 30, 0)
 
     def tableWidth(self):
         print(inspect.currentframe().f_code.co_name)
@@ -942,7 +1126,7 @@ class MainWindow(QMainWindow):
                         item = QTableWidgetItem(str(val))
                         self.table.setItem(n*(per+s) + k, zone, item)
 
-        self.updateMap()
+        # self.updateMap()
 
     def saveData(self):
         print(inspect.currentframe().f_code.co_name)
@@ -995,16 +1179,16 @@ class Delegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         super().paint(painter, option, index)
 
-        # Overlap of colored zone and grey even block
+        # Overlap of colored zone and gray even block
         if index.column() != 0 and \
            (index.row() // window.numStatParam) % 2 == 1:
-            color = self.overlap(np.array([120, 120, 120, 120]),
-                            np.array([*zoneColors[index.column()-1], 80]))
+            color = self.overlap(np.array([120, 120, 120, 120]),  # gray
+                                 np.array([*zoneColors[index.column()], 80]))
         # Colored zone
         elif index.column() != 0:
-            color = (*zoneColors[index.column()-1], 80)
+            color = (*zoneColors[index.column()], 80)
 
-        # Grey even block
+        # Gray even block
         elif (index.row() // window.numStatParam) % 2 == 1:
                 color = (200, 200, 200, 120)
 
