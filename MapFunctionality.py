@@ -10,11 +10,11 @@ from PyQt6.QtWidgets import (
     QStyleFactory, QRubberBand
 )
 from PyQt6.QtCore import (
-    Qt, QSize, pyqtSlot, QPointF, QRect
+    Qt, QSize, pyqtSlot, QPointF, QRect, QBitArray, QPoint
     )
 from PyQt6.QtGui import (
     QIcon,
-    QPen, QPixmap, QPainter, QColor, QPalette
+    QPen, QPixmap, QPainter, QColor, QPalette, QBitmap
 )
 
 import superqt
@@ -447,14 +447,23 @@ class MapWidget(QLabel):
         rect = QRect(self.startPoint, endPoint).normalized()
 
         self.rubberBand.hide()
+        buttonType = self.areaBtnIdx[self.areaBtnGroup.checkedId()]
 
         layout = self.mapLayout.currentWidget().layout()
         for i in range(layout.count()):
             button = layout.itemAt(i).widget()
             buttonRect = button.geometry()
 
-            if rect.contains(buttonRect) or rect.intersects(buttonRect):
-                button.setChecked(True)
+            if buttonType == 'Square':
+                buttonReg = button.mask()
+                for x in range(rect.left(), rect.right() + 1):
+                    for y in range(rect.top(), rect.bottom() + 1):
+                        if buttonReg.contains(QPoint(x, y)) and rect.contains(QPoint(x, y)):
+                            button.setChecked(True)
+
+            else:
+                if rect.contains(buttonRect) or rect.intersects(buttonRect):
+                    button.setChecked(True)
 
 class MapButton(QPushButton):
     def __init__(self, text, parent):
