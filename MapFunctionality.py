@@ -7,10 +7,10 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QButtonGroup, QSpacerItem,
     QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStyleFactory
+    QStyleFactory, QRubberBand
 )
 from PyQt6.QtCore import (
-    Qt, QSize, pyqtSlot, QPointF
+    Qt, QSize, pyqtSlot, QPointF, QRect
     )
 from PyQt6.QtGui import (
     QIcon,
@@ -33,6 +33,8 @@ class MapWidget(QLabel):
         self.numLasers = self.params['numLasers']
         self.mapSide = self.params['mapSide']
         self.cell = int(self.mapSide / self.numLasers)
+
+        self.rubberBand = QRubberBand(QRubberBand.Shape.Rectangle, self)
 
         self.zoneCoord = np.zeros((self.numLasers, self.numLasers), dtype=int)
 
@@ -281,7 +283,7 @@ class MapWidget(QLabel):
         for i in range(self.numLasers):
             self.cellMapButtons.append([])
             for j in range(self.numLasers):
-                self.cellMapButtons[i].append(QPushButton('', self))
+                self.cellMapButtons[i].append(MapButton('', self))
                 self.cellMapButtons[i][j].setFixedSize(self.cell, self.cell)
                 self.cellMapButtons[i][j].setCheckable(True)
                 self.cellMapLayout.addWidget(self.cellMapButtons[i][j], i, j)
@@ -303,7 +305,7 @@ class MapWidget(QLabel):
         self.columnMapButtons = []
 
         for i in range(self.numLasers):
-            self.columnMapButtons.append(QPushButton('', self))
+            self.columnMapButtons.append(MapButton('', self))
             self.columnMapButtons[i].setFixedSize(self.cell, self.mapSide)
             self.columnMapButtons[i].setCheckable(True)
             self.columnMapLayout.addWidget(self.columnMapButtons[i])
@@ -325,7 +327,7 @@ class MapWidget(QLabel):
         self.rowMapButtons = []
 
         for i in range(self.numLasers):
-            self.rowMapButtons.append(QPushButton('', self))
+            self.rowMapButtons.append(MapButton('', self))
             self.rowMapButtons[i].setFixedSize(self.mapSide, self.cell)
             self.rowMapButtons[i].setCheckable(True)
             self.rowMapLayout.addWidget(self.rowMapButtons[i])
@@ -347,7 +349,7 @@ class MapWidget(QLabel):
         self.squareMapButtons = []
 
         for i in range(8):
-            self.squareMapButtons.append(QPushButton('', self))
+            self.squareMapButtons.append(MapButton('', self))
             self.squareMapButtons[i].setFixedSize(self.mapSide, self.mapSide)
             self.squareMapButtons[i].setCheckable(True)
 
@@ -428,3 +430,38 @@ class MapWidget(QLabel):
                 self.mapLayout.insertWidget(idx, areaMap)
 
         self.makeAreaButtons()
+
+    def mousePressEvent(self, event):
+        self.startPoint = event.position().toPoint()
+
+    def mouseMoveEvent(self, event):
+        endPoint = event.position().toPoint()
+
+        rect = QRect(self.startPoint, endPoint).normalized()
+
+        self.rubberBand.setGeometry(rect)
+        self.rubberBand.show()
+
+    def mouseReleaseEvent(self, event):
+        endPoint = event.position().toPoint()
+        rect = QRect(self.startPoint, endPoint).normalized()
+
+        self.rubberBand.hide()
+
+        layout = self.mapLayout.currentWidget().layout()
+        for i in range(layout.count()):
+            button = layout.itemAt(i).widget()
+            buttonRect = button.geometry()
+
+            if rect.contains(buttonRect) or rect.intersects(buttonRect):
+                button.setChecked(True)
+
+class MapButton(QPushButton):
+    def __init__(self, text, parent):
+        super().__init__(text, parent)
+
+    def mousePressEvent(self, event):
+          # Ignore the event and pass it to the parent widget
+          self.toggle()
+          event.ignore()
+          # super().mousePressEvent(event)
