@@ -26,7 +26,8 @@ from superqt import QRangeSlider
 
 from OpenFieldDataProcessing import DataProcessing
 #TODO Expand zoneCoolors to allow more zones
-from MapButtonStyleSheet import Colors, Delegate
+from ColorStyle import Colors, Delegate
+from MapFunctionality import MapWidget
 
 
 class MainWindow(QMainWindow):
@@ -53,15 +54,10 @@ class MainWindow(QMainWindow):
                       'boxSide': 40,        # cm
                       'numStatParam': 5}    # Time, distance, velocity,
                                             # rearings number, rearings time
-        self.numLasers = self.params['numLasers']
-        self.mapSide = self.params['mapSide']
-        self.cell = self.mapSide // self.numLasers
+        # self.numLasers = self.params['numLasers']
         # self.mapSide = min(self.height(), self.width()/2) * 2/3
         self.numStatParam = self.params['numStatParam']
         self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
-
-        self.zoneCoord = np.zeros((self.numLasers, self.numLasers), dtype=int)
-        self.numZones = 0
 
         self.verticalHeaders = ['Time (s)', 'Distance (cm)', 'Velocity (cm/s)',
                                 'Rearings number', 'Rearings time (s)']
@@ -108,8 +104,7 @@ class MainWindow(QMainWindow):
         # Default LineEdit background will be needed for error warning
         self.defaultLineEditBackground = self.periodLine.palette().color(
                                          QPalette.Active, QPalette.Base)
-        #???
-        self.mins = QLabel(' seconds')
+        self.secondsLabel = QLabel(' seconds')
 
         self.addZoneBtn = QPushButton('Add zone')
         self.addZoneBtn.setFixedWidth(80)
@@ -126,10 +121,9 @@ class MainWindow(QMainWindow):
         self.startTime.setValidator(inputValidator)
         self.endTime.setValidator(inputValidator)
 
-        self.map = QLabel()
-        self.defineAreaTypes()
+        self.map = MapWidget(self, self.params)
         # self.map.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-        self.drawMap()
+
         self.setTable()
 
     def setTable(self):
@@ -190,10 +184,10 @@ class MainWindow(QMainWindow):
         print(inspect.currentframe().f_code.co_name)
 
         self.getFileButton.clicked.connect(self.getFile)
-        self.addZoneBtn.clicked.connect(self.addNewZone)
+        self.addZoneBtn.clicked.connect(self.map.addNewZone)
         self.saveButton.clicked.connect(self.saveData)
 
-        self.areaBtnGroup.idToggled.connect(self.newAreaButton)
+        self.map.areaBtnGroup.idToggled.connect(self.map.newAreaButton)
         # Update period
         self.periodLine.editingFinished.connect(self.checkPeriodValue)
 
@@ -202,8 +196,8 @@ class MainWindow(QMainWindow):
         self.endTime.editingFinished.connect(self.checkEndTimeValue)
 
         # Update time range from slider
-        self.timeRangeSlider.sliderMoved.connect(self.sliderUpdateMapPath)
-        self.timeRangeSlider.sliderReleased.connect(self.sliderUpdateTimeRange)
+        self.timeRangeSlider.sliderMoved.connect(self.sliderUpdateTimeRange)
+        self.timeRangeSlider.sliderReleased.connect(self.selectedStatistics)
 
     def setLayouts(self):
         print(inspect.currentframe().f_code.co_name)
@@ -217,13 +211,13 @@ class MainWindow(QMainWindow):
         periodLayout = QHBoxLayout()
         periodLayout.addWidget(self.timePeriod, alignment = Qt.AlignRight)
         periodLayout.addWidget(self.periodLine, alignment = Qt.AlignRight)
-        periodLayout.addWidget(self.mins, alignment = Qt.AlignRight)
+        periodLayout.addWidget(self.secondsLabel, alignment = Qt.AlignRight)
 
         self.controlLayout = QGridLayout()
         self.controlLayout.addWidget(self.getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.fileNameLabel, 0, 1, 1, 2)
         self.controlLayout.addWidget(self.addZoneBtn, 1, 0, 1, 2, Qt.AlignRight)
-        self.controlLayout.addLayout(self.areaBtnLayout, 2, 0, 1, 1, Qt.AlignLeft)
+        self.controlLayout.addLayout(self.map.areaBtnLayout, 2, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.map, 2, 1, 1, 1, Qt.AlignLeft)
         self.controlLayout.addLayout(periodLayout, 4, 0, 1, 2,
                                      (Qt.AlignRight | Qt.AlignBottom))
@@ -285,20 +279,15 @@ class MainWindow(QMainWindow):
         self.fileNameLabel.setText(clippedText)
 
         # Make path for visualization
-        self.pathPoints = []
-        for _, row in self.stat.data.iterrows():
-            x = int(row['x'] * self.cell - self.cell / 2)
-            y = int(row['y'] * self.cell - self.cell / 2)
-            self.pathPoints.append(QPointF(x, y))
-        self.pathPoints = np.array(self.pathPoints)
+        self.map.makePath(self.stat.data)
 
         # Update window
         self.setTimeRange()
-        self.updateMapPath(0, self.stat.data.index[-1])
+        self.map.updateMapPath(0, self.stat.data.index[-1])
         self.fillTable()
         self.saveButton.setEnabled(True)
 
-    def selectedStatistics(self, start, end):
+    def selectedStatistics(self):
         print(inspect.currentframe().f_code.co_name)
 
         '''
@@ -308,6 +297,9 @@ class MainWindow(QMainWindow):
         '''
 
         n = self.numStatParam
+
+        start = float(self.startTime.text())
+        end = float(self.endTime.text())
 
         iStart = self.stat.timeIndex(start)
         iEnd = self.stat.timeIndex(end)
@@ -331,7 +323,7 @@ class MainWindow(QMainWindow):
         self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
         self.updatePeriod()
 
-        self.updateMapPath(iStart, iEnd)
+        self.map.updateMapPath(iStart, iEnd)
 
     def setTimeRange(self):
         print(inspect.currentframe().f_code.co_name)
@@ -394,16 +386,21 @@ class MainWindow(QMainWindow):
 
         self.fillTable()
 
-    def sliderUpdateTimeRange(self):
+    def sliderUpdateTimeRange(self, value):
         print(inspect.currentframe().f_code.co_name)
 
-        start, end = [x/10 for x in self.timeRangeSlider.value()]
+        ''' Update path while Selected time slider is being moved '''
+
+        start, end = [x/10 for x in value] #self.timeRangeSlider.value()]
 
         # Update values in text editors based on slider
         self.startTime.setText(str(start))
         self.endTime.setText(str(end))
 
-        self.selectedStatistics(start, end)
+        iStart = self.stat.timeIndex(start)
+        iEnd = self.stat.timeIndex(end)
+
+        self.map.updateMapPath(iStart, iEnd)
 
     def textUpdateTimeRange(self, start, end):
         print(inspect.currentframe().f_code.co_name)
@@ -513,399 +510,6 @@ class MainWindow(QMainWindow):
 
         self.textUpdateTimeRange(self.startSelected, end)
 
-    def drawMap(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' Create empty map '''
-
-        self.mapCanvas = QPixmap(self.mapSide + 1, self.mapSide + 1)
-
-        # Define separate layers for grid, zone colors and path
-        self.gridLayer = QPixmap(self.mapSide + 1, self.mapSide + 1)
-        self.zoneLayer = QPixmap(self.mapSide + 1, self.mapSide + 1)
-        self.pathLayer = QPixmap(self.mapSide + 1, self.mapSide + 1)
-
-        self.gridLayer.fill()
-        self.zoneLayer.fill(Qt.transparent)
-        self.pathLayer.fill(Qt.transparent)
-
-        gridPainter = QPainter(self.gridLayer)
-
-        # Draw grid
-        for i in range(self.numLasers + 1): #TODO add second loop for rectangle field
-            step = self.cell * i
-            gridPainter.drawLine(0, step, self.mapSide, step)
-            gridPainter.drawLine(step, 0, step, self.mapSide)
-
-        gridPainter.end()
-
-        self.updateMap()
-
-        self.map.setStyleSheet(Colors.styleSheet(self.numZones))
-
-    def updateMap(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' Add Zone and Path layers to the map widget '''
-
-        mapPainter = QPainter(self.mapCanvas)
-
-        mapPainter.drawPixmap(0, 0, self.gridLayer)
-        mapPainter.drawPixmap(0, 0, self.zoneLayer)
-        mapPainter.drawPixmap(0, 0, self.pathLayer)
-
-        mapPainter.end()
-
-        self.map.setPixmap(self.mapCanvas)
-
-    def updateMapZones(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' Update map area coloring based on zone selection '''
-
-        self.zoneLayer.fill(Qt.transparent)
-
-        zonePainter = QPainter(self.zoneLayer)
-
-        # Fill cells with color
-        for i in range(self.numLasers):
-            for j in range(self.numLasers):
-                zone = self.zoneCoord[i][j]
-                zoneColor = QColor(*Colors.zoneColors[zone], int(0.3*255))
-                zonePainter.setBrush(zoneColor)
-                x = self.cell * j
-                y = self.cell * i
-                zonePainter.drawRect(x, y, self.cell, self.cell)
-
-        zonePainter.end()
-
-        self.updateMap()
-
-    def updateMapPath(self, iStart, iEnd):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' Draw path in Selected time '''
-
-        self.pathLayer.fill(Qt.transparent)
-
-        pathPainter = QPainter(self.pathLayer)
-
-        pathPainter.setPen(QPen(Qt.red, 2))
-        pathPainter.drawPolyline(self.pathPoints[iStart:iEnd])
-
-        pathPainter.end()
-
-        self.updateMap()
-
-    def sliderUpdateMapPath(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' Update path while Selected time slider is being moved '''
-
-        start, end = [x/10 for x in self.timeRangeSlider.value()]
-
-        # Update values in text editors based on slider
-        self.startTime.setText(str(start))
-        self.endTime.setText(str(end))
-
-        iStart = self.stat.timeIndex(start)
-        iEnd = self.stat.timeIndex(end)
-
-        self.updateMapPath(iStart, iEnd)
-
-    def newAreaButton(self, newBtnId, checked):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' A new area button was checked '''
-
-        newBtn = self.areaBtnIdx[newBtnId]
-
-        # User can define custom zone
-        if newBtn in self.customAreas:
-            # Show hidden map buttons after predefined area mode
-            self.mapLayout.currentWidget().show()
-            # Activate map buttons according to the current custom area type
-            self.mapLayout.setCurrentIndex(newBtnId)
-
-        # Zones are predefined
-        else:
-            # Hide custom area map buttons when in predefined area mode
-            self.mapLayout.currentWidget().hide()
-            # Define the predefined areas according to the chosen one
-            self.fillPredefinedZones(newBtn)
-
-    @pyqtSlot()
-    def addNewZone(self, numNewZones=1):
-        print(inspect.currentframe().f_code.co_name)
-
-        '''
-        Add a new zone to map and table from two sources:
-            - user-defined area with map buttons:
-                fillTable=True, numNewZones=1
-            - two predefined areas:
-                fillTable=False, numNewZones=2
-        '''
-
-        for i in range(numNewZones):
-
-            #TODO To make more zones delete it
-            if self.numZones == 4:                 # Maximum 4 zones
-                return
-            self.numZones += 1
-
-            # Add new table column
-            header = QTableWidgetItem(f'Zone {self.numZones}')
-            num = self.table.columnCount()
-            self.table.setColumnCount(num + 1)
-            self.table.setHorizontalHeaderItem(num, header)
-            # app.processEvents()
-            # self.adjustSize()
-
-        # Do not allow to add empty zone before a new area is selected
-        self.addZoneBtn.setDisabled(True)
-
-        self.fillTable()
-
-        # Loop through all map buttons in all map layouts and uncheck them
-        for i in range(self.mapLayout.count()):
-            layout = self.mapLayout.widget(i).layout()
-            for i in range(layout.count()):
-                button = layout.itemAt(i).widget()
-                button.blockSignals(True)
-                button.setChecked(False)
-                button.blockSignals(False)
-
-        self.map.setStyleSheet(Colors.styleSheet(self.numZones))
-        # self.adjustSize()
-
-    def fillPredefinedZones(self, newBtn):
-        print(inspect.currentframe().f_code.co_name)
-
-        n = self.numLasers
-
-        # Split field vertically into two halves
-        if newBtn == 'Vertical_halves':
-            self.zoneCoord[:, :n//2] = 1
-            self.zoneCoord[:, n//2:] = 2
-
-        # Split field horizontally into two halves
-        elif newBtn == 'Horizontal_halves':
-            self.zoneCoord[:n//2, :] = 1
-            self.zoneCoord[n//2:, :] = 2
-
-        # Split field into central and peripheral zones
-        elif newBtn == 'Wall':
-            self.zoneCoord[:, :] = 1
-            self.zoneCoord[n//4 : 3*n//4, n//4 : 3*n//4] = 2
-
-        self.updateMapZones()
-        self.numZones = 0
-        self.table.setColumnCount(1)
-        self.addNewZone(numNewZones=2)
-
-    def mapBtnToggled(self, checked, x=-1, y=-1, s=-1):
-        print(inspect.currentframe().f_code.co_name)
-
-        '''
-        Actions when a map button was checked (add area for a new zone).
-        Signals are defined in each area type method
-        '''
-
-        buttonType = self.areaBtnIdx[self.areaBtnGroup.checkedId()]
-        #TODO To make more zones delete it
-        if self.numZones == 4:
-            return
-
-        if checked:
-            # Assign area coordinated to the index of the next zone
-            zoneValue = self.numZones + 1
-            # Allow to add a new zone after some area was selected
-            self.addZoneBtn.setEnabled(True)
-        else:
-            # Exclude unchecked area from any zone
-            zoneValue = 0
-
-        # Assign the area checked with a custom button to the new zone
-        if buttonType == 'Cell':
-            self.zoneCoord[x][y] = zoneValue
-        elif buttonType == 'Column':
-            self.zoneCoord[:,y] = zoneValue
-        elif buttonType == 'Row':
-            self.zoneCoord[x,:] = zoneValue
-        elif buttonType == 'Square':
-            self.zoneCoord[[s, -s-1], s:self.numLasers-s] = zoneValue
-            self.zoneCoord[s:self.numLasers-s, [s, -s-1]] = zoneValue
-
-        # If all new areas were unchecked - do not allow adding empty zone
-        if not checked and self.numZones + 1 not in self.zoneCoord:
-            self.addZoneBtn.setEnabled(False)
-
-        self.updateMapZones()
-
-    def cellMapButtons(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' One cell map button, corresponds to one laser intersection '''
-
-        self.cellMap = QWidget(self.map)
-        self.cellMapLayout = QGridLayout(self.cellMap)
-        self.cellMapLayout.setSpacing(0)
-        self.cellMapLayout.setContentsMargins(0, 0, 0, 0)
-        self.cellMapButtons = []
-
-        for i in range(self.numLasers):
-            self.cellMapButtons.append([])
-            for j in range(self.numLasers):
-                self.cellMapButtons[i].append(QPushButton('', self.map))
-                self.cellMapButtons[i][j].setFixedSize(self.cell, self.cell)
-                self.cellMapButtons[i][j].setCheckable(True)
-                self.cellMapLayout.addWidget(self.cellMapButtons[i][j], i, j)
-                self.cellMapButtons[i][j].toggled.connect(
-                    lambda checked, i=i, j=j:
-                        self.mapBtnToggled(checked=checked, x=i, y=j))
-
-        return self.cellMap
-
-    def columnMapButtons(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' Map buttons are vertical columns '''
-
-        self.columnMap = QWidget(self.map)
-        self.columnMapLayout = QHBoxLayout(self.columnMap)
-        self.columnMapLayout.setSpacing(0)
-        self.columnMapLayout.setContentsMargins(0, 0, 0, 0)
-        self.columnMapButtons = []
-
-        for i in range(self.numLasers):
-            self.columnMapButtons.append(QPushButton('', self.map))
-            self.columnMapButtons[i].setFixedSize(self.cell, self.mapSide)
-            self.columnMapButtons[i].setCheckable(True)
-            self.columnMapLayout.addWidget(self.columnMapButtons[i])
-            self.columnMapButtons[i].toggled.connect(
-                lambda checked, i=i:
-                    self.mapBtnToggled(checked=checked, y=i))
-
-        return self.columnMap
-
-    def rowMapButtons(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' Map buttons are horizontal rows '''
-
-        self.rowMap = QWidget(self.map)
-        self.rowMapLayout = QVBoxLayout(self.rowMap)
-        self.rowMapLayout.setSpacing(0)
-        self.rowMapLayout.setContentsMargins(0, 0, 0, 0)
-        self.rowMapButtons = []
-
-        for i in range(self.numLasers):
-            self.rowMapButtons.append(QPushButton('', self.map))
-            self.rowMapButtons[i].setFixedSize(self.mapSide, self.cell)
-            self.rowMapButtons[i].setCheckable(True)
-            self.rowMapLayout.addWidget(self.rowMapButtons[i])
-            self.rowMapButtons[i].toggled.connect(
-                lambda checked, i=i:
-                    self.mapBtnToggled(checked=checked, x=i))
-
-        return self.rowMap
-
-    def squareMapButtons(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' Map buttons are concentric squares '''
-
-        self.squareMap = QWidget(self.map)
-        self.squareMapLayout = QGridLayout(self.squareMap)
-        self.squareMapLayout.setSpacing(0)
-        self.squareMapLayout.setContentsMargins(0, 0, 0, 0)
-        self.squareMapButtons = []
-
-        for i in range(8):
-            self.squareMapButtons.append(QPushButton('', self.map))
-            self.squareMapButtons[i].setFixedSize(self.mapSide, self.mapSide)
-            self.squareMapButtons[i].setCheckable(True)
-
-            #TODO Add sys._MEIPASS here to package into one file
-            pixmap = QPixmap(os.path.join('Area_pixmaps', f'{i+1}.png'))
-            self.squareMapButtons[i].setMask(pixmap.scaled(self.squareMapButtons[i].size(),
-                                                    Qt.IgnoreAspectRatio).mask())
-            self.squareMapLayout.addWidget(self.squareMapButtons[i], 0, 0)
-            self.squareMapButtons[i].toggled.connect(
-                lambda checked, i=i:
-                    self.mapBtnToggled(checked=checked, s=i))
-
-        return self.squareMap
-
-
-
-    def makeAreaButtons(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        ''' Create area type buttons, arranged vertically to the left of the map '''
-
-        numAreaBtn = len(self.areaBtnIdx)
-        size = int(self.mapSide / (numAreaBtn * 1.5))
-
-        self.areaBtnGroup = QButtonGroup()
-        self.areaBtnLayout = QVBoxLayout()
-
-        for idx, name in self.areaBtnIdx.items():
-            # Make current button
-            button = QPushButton()
-            # Add button to QButtonGroup
-            self.areaBtnGroup.addButton(button, id=idx)
-
-            #TODO Add sys._MEIPASS here to package into one file
-            pixmap = QPixmap(os.path.join('Area_Buttons_pixmaps', f'{name}.png'))
-
-            # Set button's parameters
-            self.areaBtnGroup.button(idx).setIcon(QIcon(pixmap))
-            self.areaBtnGroup.button(idx).setIconSize(QSize(size, size))
-            self.areaBtnGroup.button(idx).setFixedSize(size, size)
-            self.areaBtnGroup.button(idx).setCheckable(True)
-
-            # Set Cell as the default area type
-            if name == 'Cell':
-                self.areaBtnGroup.button(idx).setChecked(True)
-
-            # Add button to QVBoxLayout
-            self.areaBtnLayout.addWidget(self.areaBtnGroup.button(idx))
-
-        self.areaBtnLayout.setSpacing(size // 2)
-        # Add additional spacing between custom and predefined area buttons
-        self.areaBtnLayout.insertSpacing(len(self.customAreas), size // 2)
-
-        # self.areaBtnLayout.setContentsMargins(0, 0, 30, 0)
-
-    def defineAreaTypes(self):
-        print(inspect.currentframe().f_code.co_name)
-
-        '''
-        Define custom and predefined areas,
-        make stacked layout with map buttons of different types
-        '''
-
-        self.customAreas = ['Cell', 'Column', 'Row', 'Square']
-        self.predefinedAreas = ['Vertical_halves', 'Horizontal_halves', 'Wall']
-        customAreaMethods = [self.cellMapButtons, self.columnMapButtons,
-                                  self.rowMapButtons, self.squareMapButtons]
-
-        # Make dict to index through QButtonGroup and QStackedLayout
-        self.areaBtnIdx = {i: k for i, k
-                           in enumerate(self.customAreas + self.predefinedAreas)}
-
-        self.mapLayout = QStackedLayout()
-
-        for idx, name in self.areaBtnIdx.items():
-            # Create custom area map buttons with separate methods,
-            # and them to self.mapLayout - a QStackedLayout
-            if name in self.customAreas:
-                areaMap = customAreaMethods[idx]()
-                self.mapLayout.insertWidget(idx, areaMap)
-
-        self.makeAreaButtons()
-
     def tableWidth(self):
         print(inspect.currentframe().f_code.co_name)
 
@@ -938,7 +542,7 @@ class MainWindow(QMainWindow):
         # self.adjustSize()
 
         try:
-            self.tableData = self.stat.table(self.zoneCoord, self.startSelected,
+            self.tableData = self.stat.table(self.map.zoneCoord, self.startSelected,
                                         self.endSelected, self.period,
                                         self.statParam)
         except AttributeError:  # If .csv has not yet been opened
@@ -948,7 +552,7 @@ class MainWindow(QMainWindow):
         n = self.numStatParam
 
         # Fill Total time statistics
-        for zone in range(self.numZones+1):
+        for zone in range(self.map.numZones+1):
             for k in range(n):
                 key = self.statParam[k]
                 val = round(self.tableData[0][zone][key], 1)
@@ -957,7 +561,7 @@ class MainWindow(QMainWindow):
 
         # Fill Selected time statistics
         if self.hasSelectedStat:
-            for zone in range(self.numZones+1):
+            for zone in range(self.map.numZones+1):
                 for k in range(n):
                     key = self.statParam[k]
                     val = round(self.tableData[-1][zone][key], 1)
@@ -967,7 +571,7 @@ class MainWindow(QMainWindow):
         # Fill Periods statistics
         if self.numPeriods != 0:
             for per in range(1, self.numPeriods+1):
-                for zone in range(self.numZones+1):
+                for zone in range(self.map.numZones+1):
                     for k in range(n):
                         key = self.statParam[k]
                         val = round(self.tableData[per][zone][key], 1)
@@ -990,14 +594,14 @@ class MainWindow(QMainWindow):
 
             # Write horizontal header
             writer.writerow(['', '', 'Whole field']
-                            + [f'Zone {x+1}' for x in range(self.numZones)])
+                            + [f'Zone {x+1}' for x in range(self.map.numZones)])
 
             # Write Total time statistics
             for k in range(n):
                 key = self.statParam[k]
                 writer.writerow(['Total time', f'{self.verticalHeaders[k]}']
                                 + [round(self.tableData[0][zone][key], 1)
-                                 for zone in range(self.numZones+1)])
+                                 for zone in range(self.map.numZones+1)])
 
             # Write Selected time statistics
             if self.hasSelectedStat:
@@ -1007,7 +611,7 @@ class MainWindow(QMainWindow):
                     f'Selected time {self.startSelected}-{self.endSelected} s',
                     f'{self.verticalHeaders[k]}']
                     + [round(self.tableData[-1][zone][key], 1)
-                       for zone in range(self.numZones+1)])
+                       for zone in range(self.map.numZones+1)])
 
             # Write Periods statistics
             if self.numPeriods != 0:
@@ -1019,7 +623,7 @@ class MainWindow(QMainWindow):
                         writer.writerow([f'{start}-{end} s',
                                          f'{self.verticalHeaders[k]}']
                                         + [round(self.tableData[per+1][zone][key], 1)
-                                           for zone in range(self.numZones+1)])
+                                           for zone in range(self.map.numZones+1)])
 
 if __name__ == '__main__':
     app = QApplication(os.sys.argv)
