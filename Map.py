@@ -137,8 +137,8 @@ class MapWidget(QLabel):
 
         self.pathPoints = []
         for _, row in data.iterrows():
-            x = int(row['x'] * self.cell - self.cell / 2)
-            y = int(row['y'] * self.cell - self.cell / 2)
+            x = row['x'] * self.cell - self.cell / 2
+            y = row['y'] * self.cell - self.cell / 2
             self.pathPoints.append(QPointF(x, y))
         self.pathPoints = np.array(self.pathPoints)
 

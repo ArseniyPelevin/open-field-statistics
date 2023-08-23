@@ -5,17 +5,12 @@ import pandas as pd
 import inspect
 
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QFileDialog,
-    QLabel, QPushButton,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QSpacerItem,
-    QStyleFactory
+    QApplication, QMainWindow, QStyleFactory, QFileDialog,
+    QWidget, QLabel, QPushButton,
+    QVBoxLayout, QHBoxLayout, QGridLayout, QSpacerItem
 )
-from PyQt6.QtCore import (
-    Qt, QSize, QEvent, QPointF
-    )
-from PyQt6.QtGui import (
-    QFontMetrics, QIcon
-)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFontMetrics, QIcon
 
 from superqt import QRangeSlider
 
@@ -54,8 +49,8 @@ class MainWindow(QMainWindow):
         #TODO delete individual parameters to add global settings
         self.params = {'numLasers': 16,     # On one side
                        'mapSide': 320,      # px
-                       'boxSide': 40,        # cm
-                       'numStatParam': 5}    # Time, distance, velocity,
+                       'boxSide': 40,       # cm
+                       'numStatParam': 5}   # Time, distance, velocity,
                                             # rearings number, rearings time
         # self.mapSide = min(self.height(), self.width()/2) * 2/3
 
@@ -65,23 +60,6 @@ class MainWindow(QMainWindow):
 
         self.numStatParam = self.params['numStatParam']
         self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
-
-    '''
-    def resizeEvent(self, e):
-        # try:
-            availableHeight = self.height() \
-                - sum([self.controlLayout.rowMinimumHeight(row)
-                        for row in [0, 1, 4, 5]])
-            print(self.controlLayout.rowMinimumHeight(5))
-            availableWidth = 600 #self.width() - (self.tableWidth()
-                                  # + self.controlLayout.columnMinimumWidth(0))
-            self.mapSide = (s := min(availableHeight, availableWidth)) \
-                            - (s % self.numLasers)
-            self.drawMap()
-        except AttributeError:
-            raise
-    '''
-
 
     def setWidgets(self):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -170,6 +148,22 @@ class MainWindow(QMainWindow):
         self.map.updateMapPath(0, self.stat.data.index[-1])
         self.table.fillTable()
         self.saveButton.setEnabled(True)
+
+    '''
+    def resizeEvent(self, e):
+        # try:
+            availableHeight = self.height() \
+                - sum([self.controlLayout.rowMinimumHeight(row)
+                        for row in [0, 1, 4, 5]])
+            print(self.controlLayout.rowMinimumHeight(5))
+            availableWidth = 600 #self.width() - (self.tableWidth()
+                                  # + self.controlLayout.columnMinimumWidth(0))
+            self.mapSide = (s := min(availableHeight, availableWidth)) \
+                            - (s % self.numLasers)
+            self.drawMap()
+        except AttributeError:
+            raise
+    '''
 
 
 if __name__ == '__main__':

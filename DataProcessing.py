@@ -33,7 +33,7 @@ class DataProcessing():
             y = fmean([row['Y1'], row['Y2']])
 
             # Change from original bottom-left coordinates to numpy and qt top-left
-            y = params['numLasers'] - y
+            y = params['numLasers'] - y + 1
 
             # Rearing
             z = True if row['Z'] else False   # 'numpy.bool_' to 'bool'
