@@ -20,7 +20,7 @@ from PyQt6.QtGui import (
 from superqt import QRangeSlider
 
 from DataProcessing import DataProcessing
-from MapFunctionality import MapWidget
+from Map import MapWidget
 from Time import TimePeriodSettings
 from Table import TableWidget
 
@@ -40,10 +40,10 @@ class MainWindow(QMainWindow):
         self.setVariables()
         self.setWidgets()
 
-        self.map = MapWidget(self, self.params)
+        self.map = MapWidget(self)
         # self.map.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.time = TimePeriodSettings(self)
-        self.table = TableWidget(self, app, self.numStatParam, 1)
+        self.table = TableWidget(self, app, rows=self.numStatParam, columns=1)
 
         self.setSignals()
         self.setLayouts()
@@ -57,8 +57,12 @@ class MainWindow(QMainWindow):
                        'boxSide': 40,        # cm
                        'numStatParam': 5}    # Time, distance, velocity,
                                             # rearings number, rearings time
-        # self.numLasers = self.params['numLasers']
         # self.mapSide = min(self.height(), self.width()/2) * 2/3
+
+        # Make MapSide divisible by numLasers
+        if self.params['mapSide'] % self.params['numLasers'] != 0:
+            self.params['mapSide'] -= self.params['mapSide'] % self.params['numLasers']
+
         self.numStatParam = self.params['numStatParam']
         self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
 
@@ -86,10 +90,6 @@ class MainWindow(QMainWindow):
         self.getFileButton.setFixedWidth(80)
         self.fileNameLabel = QLabel()
 
-        self.addZoneBtn = QPushButton('Add zone')
-        self.addZoneBtn.setFixedWidth(80)
-        self.addZoneBtn.setDisabled(True)
-
         self.saveButton = QPushButton('Save data')
         self.saveButton.setFixedWidth(80)
         self.saveButton.setDisabled(True)
@@ -98,7 +98,6 @@ class MainWindow(QMainWindow):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.getFileButton.clicked.connect(self.getFile)
-        self.addZoneBtn.clicked.connect(self.map.addNewZone)
         self.saveButton.clicked.connect(self.table.saveData)
 
     def setLayouts(self):
@@ -107,7 +106,7 @@ class MainWindow(QMainWindow):
         self.controlLayout = QGridLayout()
         self.controlLayout.addWidget(self.getFileButton, 0, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.fileNameLabel, 0, 1, 1, 2)
-        self.controlLayout.addWidget(self.addZoneBtn, 1, 0, 1, 2, Qt.AlignRight)
+        self.controlLayout.addWidget(self.map.addZoneBtn, 1, 1, 1, 1, Qt.AlignRight)
         self.controlLayout.addLayout(self.map.areaBtnLayout, 2, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.map, 2, 1, 1, 1, Qt.AlignLeft)
         self.controlLayout.addLayout(self.time.periodLayout, 4, 0, 1, 2,
@@ -117,7 +116,7 @@ class MainWindow(QMainWindow):
         # Add spacers
         self.controlLayout.addItem(QSpacerItem(0, 0), 0, 2, 5, 1)
         self.controlLayout.setColumnStretch(3, 1)
-        self.controlLayout.addItem(QSpacerItem(0, 0), 3, 0, 1, 2)
+        # self.controlLayout.addItem(QSpacerItem(0, 0), 3, 0, 1, 2)
         self.controlLayout.setRowStretch(3, 1)
 
         self.dataLayout = QVBoxLayout()

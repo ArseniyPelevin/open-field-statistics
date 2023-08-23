@@ -27,6 +27,11 @@ class TimePeriodSettings:
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.window = window
+        self.map = self.window.map
+        # self.map.time = self
+        self.table = None
+
+
         self.numStatParam = self.window.numStatParam
         self.hasSelectedStat = False
 
@@ -57,7 +62,7 @@ class TimePeriodSettings:
         self.secondsLabel = QLabel(' seconds')
 
         # Set input validator
-        rx = QRegularExpression(r'^\d+\.?\d*$')  # float
+        rx = QRegularExpression(r'^\d*\.?\d?$')  # float
         inputValidator = QRegularExpressionValidator(rx)
         self.periodLine.setValidator(inputValidator)
         self.startTime.setValidator(inputValidator)
@@ -104,7 +109,7 @@ class TimePeriodSettings:
         self.numPeriods = 0
 
         self.setTimeRange()
-        self.table = self.window.table
+        # self.table = self.window.table
 
     def setTimeRange(self):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -143,8 +148,9 @@ class TimePeriodSettings:
         if start == 0 and end == self.stat.totalTime:
             self.hasSelectedStat = False
         else:
-            headersSelected = [QTableWidgetItem(f'Selected time {start}-{end} s,\n{x}')
-                               for x in self.table.verticalHeaders]
+            headersSelected = [QTableWidgetItem
+                               (f'Selected time {start}-{end} s,\n{header}')
+                               for header in self.table.verticalHeaders]
             for i in range(n):
                 # If there was Selected time statistics before - delete it
                 if self.hasSelectedStat:
@@ -159,7 +165,7 @@ class TimePeriodSettings:
         self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
         self.updatePeriod()
 
-        self.window.map.updateMapPath(iStart, iEnd)
+        self.map.updateMapPath(iStart, iEnd)
 
     def updatePeriod(self, period=0, isUsersPeriod=False):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -219,14 +225,14 @@ class TimePeriodSettings:
         iStart = self.stat.timeIndex(start)
         iEnd = self.stat.timeIndex(end)
 
-        self.window.map.updateMapPath(iStart, iEnd)
+        self.map.updateMapPath(iStart, iEnd)
 
     def textUpdateTimeRange(self, start, end):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         # Update slider values based on text editors
         self.timeRangeSlider.setValue([start*10, end*10])
-        self.selectedStatistics(start, end)
+        self.selectedStatistics()
 
     def errorWarning(self, widget, errorMessage=''):
         print(__name__, inspect.currentframe().f_code.co_name)

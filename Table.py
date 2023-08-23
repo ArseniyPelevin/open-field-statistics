@@ -25,6 +25,9 @@ class TableWidget(QTableWidget):
         self.time = self.window.time
         self.map = self.window.map
 
+        self.time.table = self
+        self.map.table = self
+
         self.numStatParam = rows
         self.statParam = self.window.statParam
         self.verticalHeaders = ['Time (s)', 'Distance (cm)', 'Velocity (cm/s)',
@@ -87,8 +90,8 @@ class TableWidget(QTableWidget):
     def tableWidth(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        self.app.processEvents()
-        self.app.processEvents()
+        # self.app.processEvents()
+        # self.app.processEvents()
         tableWidth = self.verticalHeader().width() + \
                      self.horizontalHeader().length() + \
                      self.frameWidth() * 2
@@ -112,18 +115,15 @@ class TableWidget(QTableWidget):
         # Adjust table width to contents
         self.setFixedWidth(self.tableWidth())
         # Adjust window width to table
-        # app.processEvents()
-        # self.adjustSize()
+        self.app.processEvents()
+        self.window.adjustSize()
 
-        # try: #!!!
-        #     self.tableData = self.window.stat.table(self.map.zoneCoord, self.time.startSelected,
-        #                                 self.time.endSelected, self.time.period,
-        #                                 self.statParam)
-        # except AttributeError:  # If .csv has not yet been opened
-        #     return
-        self.tableData = self.window.stat.table(self.map.zoneCoord, self.time.startSelected,
-                                    self.time.endSelected, self.time.period,
-                                    self.statParam)
+        try:
+            self.tableData = self.window.stat.table(self.map.zoneCoord, self.time.startSelected,
+                                        self.time.endSelected, self.time.period,
+                                        self.statParam)
+        except AttributeError:  # If .csv has not yet been opened
+            return
 
         s = self.time.hasSelectedStat
         n = self.numStatParam
