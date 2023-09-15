@@ -232,6 +232,8 @@ class MapWidget(QLabel):
         nX = self.numLasersX
         nY = self.numLasersY
 
+        numNewZones = 2  # For halves or center/periphery
+
         # Split field vertically into two halves
         if newBtn == 'Vertical_halves':
             self.zoneCoord[:, :nX//2] = 1
@@ -244,14 +246,22 @@ class MapWidget(QLabel):
 
         # Split field into central and peripheral zones
         elif newBtn == 'Wall':
-            self.zoneCoord[:, :] = 1  # Periphery
+            self.zoneCoord[:, :] = 2  # Walls
             wall = int(np.ceil(min(nX, nY) / 4))
-            self.zoneCoord[wall : -wall, wall : -wall] = 2  # Center
+            self.zoneCoord[wall : -wall, wall : -wall] = 1  # Center
+
+        elif newBtn == 'Wall-corners':
+            self.zoneCoord[:, :] = 3  # Corners
+            wall = int(np.ceil(min(nX, nY) / 4))
+            self.zoneCoord[wall : -wall, :] = 2  # Walls
+            self.zoneCoord[:, wall : -wall] = 2
+            self.zoneCoord[wall : -wall, wall : -wall] = 1  # Center
+            numNewZones = 3
 
         self.updateMapZones()
         self.numZones = 0
         self.table.setColumnCount(1)
-        self.addNewZone(numNewZones=2)
+        self.addNewZone(numNewZones = numNewZones)
 
     def mapBtnToggled(self, checked, x=-1, y=-1, s=-1):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -504,7 +514,8 @@ class MapWidget(QLabel):
         '''
 
         self.customAreas = ['Cell', 'Column', 'Row', 'Square']
-        self.predefinedAreas = ['Vertical_halves', 'Horizontal_halves', 'Wall']
+        self.predefinedAreas = ['Vertical_halves', 'Horizontal_halves',
+                                'Wall', 'Wall-corners']
         customAreaMethods = [self.cellMapButtons, self.columnMapButtons,
                                   self.rowMapButtons, self.squareMapButtons]
 
