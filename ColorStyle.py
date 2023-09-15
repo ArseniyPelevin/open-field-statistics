@@ -4,6 +4,7 @@ from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtCore import Qt
 
 class Colors():
+    #TODO Expand zoneCoolors to allow more zones
     zoneColors = [(255, 255, 255),
                   (255, 0, 0), (0, 255, 0), (0, 0, 255), (100, 0, 100),
                   (255, 255, 255)]  # Blanck, when max number of zones 4 is reached

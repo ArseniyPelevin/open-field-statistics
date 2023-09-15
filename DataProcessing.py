@@ -33,7 +33,7 @@ class DataProcessing():
             y = fmean([row['Y1'], row['Y2']])
 
             # Change from original bottom-left coordinates to numpy and qt top-left
-            y = params['numLasers'] - y + 1
+            y = params['numLasersY'] - y + 1
 
             # Rearing
             z = True if row['Z'] else False   # 'numpy.bool_' to 'bool'
@@ -61,6 +61,9 @@ class DataProcessing():
 
                 p = [data[j-1]['x'], data[j-1]['y']]  # Previous point
                 q = [x, y]  # Current point
+                #!!! Account for uneven field sizes
+                # laserSpaceX = params['boxSideX'] / params['numLasersX']
+                # laserSpaceY = params['boxSideY'] / params['numLasersY']
                 d = dist(p, q) * (params['boxSide'] / params['numLasers'])
                 self.totalDistance += d
             data.append({'time': time, 'x': x, 'y': y, 'z': z, 'dist': d})

@@ -3,18 +3,15 @@ import os
 import numpy as np
 
 from PyQt6.QtWidgets import (
-    QWidget, QToolTip,
-    QLabel, QPushButton, QButtonGroup,
+    QWidget, QLabel, QPushButton, QButtonGroup,
     QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
-    QTableWidgetItem,
-    QRubberBand
+    QTableWidgetItem, QRubberBand
 )
 from PyQt6.QtCore import (
-    Qt, pyqtSlot, QPoint, QPointF, QRect
+    Qt, pyqtSlot, QPoint, QPointF, QRect, QLineF
     )
 from PyQt6.QtGui import (
-    QIcon,
-    QPen, QPixmap, QPainter, QColor
+    QIcon, QPixmap, QImage, QPainter, QPen, QColor
 )
 
 import superqt
@@ -32,15 +29,31 @@ class MapWidget(QLabel):
         # self.time = None
         self.table = None
 
-        self.numLasers = self.window.params['numLasers']
-        self.mapSide = self.window.params['mapSide']
-        self.cell = int(self.mapSide / self.numLasers)
+        # self.numLasers = self.window.params['numLasers']
+        self.numLasersX = 16
+        self.numLasersY = 16
 
+        self.mapSideY = self.window.params['mapSideY']
+        self.mapSideX = int(self.mapSideY *
+                          self.window.params['boxSideX'] / self.window.params['boxSideY'])
+
+        # Make MapSide divisible by numLasers
+        self.mapSideX -= self.mapSideX % self.numLasersX
+        self.mapSideY -= self.mapSideY % self.numLasersY
+
+        # Graphical distance between lasers
+        self.cellX = int(self.mapSideX / self.numLasersX)
+        self.cellY = int(self.mapSideY / self.numLasersY)
+
+        # Set map widget's size with a 2 px margin for border line rendering
+        self.setFixedSize(self.mapSideX + 2, self.mapSideY + 2)
+
+        # Rubber band for drag-selection
         self.rubberBand = QRubberBand(QRubberBand.Shape.Rectangle, self)
 
-        self.zoneCoord = np.zeros((self.numLasers, self.numLasers), dtype=int)
+        self.zoneCoord = np.zeros((self.numLasersY, self.numLasersX), dtype=int)
 
-        self.pathPoints = []  # Will be assigned from __main__ after loading row data
+        self.pathPoints = []  # Will be assigned from __main__ after loading raw data
         self.numZones = 0
 
         self.drawMap()
@@ -51,12 +64,13 @@ class MapWidget(QLabel):
 
         ''' Create empty map '''
 
-        self.mapCanvas = QPixmap(self.mapSide + 1, self.mapSide + 1)
+        self.mapCanvas = QPixmap(self.mapSideX + 2, self.mapSideY + 2)
 
         # Define separate layers for grid, zone colors and path
-        self.gridLayer = QPixmap(self.mapSide + 1, self.mapSide + 1)
-        self.zoneLayer = QPixmap(self.mapSide + 1, self.mapSide + 1)
-        self.pathLayer = QPixmap(self.mapSide + 1, self.mapSide + 1)
+        self.gridLayer = QPixmap(self.mapSideX + 2, self.mapSideY + 2)
+
+        self.zoneLayer = QPixmap(self.mapSideX, self.mapSideY)
+        self.pathLayer = QPixmap(self.mapSideX, self.mapSideY)
 
         self.gridLayer.fill()
         self.zoneLayer.fill(Qt.transparent)
@@ -65,10 +79,12 @@ class MapWidget(QLabel):
         gridPainter = QPainter(self.gridLayer)
 
         # Draw grid
-        for i in range(self.numLasers + 1): #TODO add second loop for rectangle field
-            step = self.cell * i
-            gridPainter.drawLine(0, step, self.mapSide, step)
-            gridPainter.drawLine(step, 0, step, self.mapSide)
+        for x in range(self.numLasersX + 1):
+            step = self.cellX * x
+            gridPainter.drawLine(QLineF(step, 0, step, self.mapSideY))
+        for y in range(self.numLasersY + 1):
+            step = self.cellY * y
+            gridPainter.drawLine(QLineF(0, step, self.mapSideX, step))
 
         gridPainter.end()
 
@@ -83,10 +99,10 @@ class MapWidget(QLabel):
 
         mapPainter = QPainter(self.mapCanvas)
 
+        # mapPainter.drawPixmap(0, 0, self.mapCanvas.width(), self.mapCanvas.height(), self.gridLayer)
         mapPainter.drawPixmap(0, 0, self.gridLayer)
         mapPainter.drawPixmap(0, 0, self.zoneLayer)
         mapPainter.drawPixmap(0, 0, self.pathLayer)
-
         mapPainter.end()
 
         self.setPixmap(self.mapCanvas)
@@ -101,14 +117,14 @@ class MapWidget(QLabel):
         zonePainter = QPainter(self.zoneLayer)
 
         # Fill cells with color
-        for i in range(self.numLasers):
-            for j in range(self.numLasers):
+        for i in range(self.numLasersY):
+            for j in range(self.numLasersX):
                 zone = self.zoneCoord[i][j]
                 zoneColor = QColor(*Colors.zoneColors[zone], int(0.3*255))
                 zonePainter.setBrush(zoneColor)
-                x = self.cell * j
-                y = self.cell * i
-                zonePainter.drawRect(x, y, self.cell, self.cell)
+                x = self.cellX * j
+                y = self.cellY * i
+                zonePainter.drawRect(x, y, self.cellX, self.cellY)
 
         zonePainter.end()
 
@@ -137,8 +153,8 @@ class MapWidget(QLabel):
 
         self.pathPoints = []
         for _, row in data.iterrows():
-            x = row['x'] * self.cell - self.cell / 2
-            y = row['y'] * self.cell - self.cell / 2
+            x = row['x'] * self.cellX - self.cellX / 2
+            y = row['y'] * self.cellY - self.cellY / 2
             self.pathPoints.append(QPointF(x, y))
         self.pathPoints = np.array(self.pathPoints)
 
@@ -213,24 +229,24 @@ class MapWidget(QLabel):
     def fillPredefinedZones(self, newBtn):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        n = self.numLasers
+        nX = self.numLasersX
+        nY = self.numLasersY
 
         # Split field vertically into two halves
         if newBtn == 'Vertical_halves':
-            self.zoneCoord[:, :n//2] = 1
-            self.zoneCoord[:, n//2:] = 2
+            self.zoneCoord[:, :nX//2] = 1
+            self.zoneCoord[:, nX//2:] = 2
 
         # Split field horizontally into two halves
         elif newBtn == 'Horizontal_halves':
-            self.zoneCoord[:n//2, :] = 1
-            self.zoneCoord[n//2:, :] = 2
+            self.zoneCoord[:nY//2, :] = 1
+            self.zoneCoord[nY//2:, :] = 2
 
         # Split field into central and peripheral zones
         elif newBtn == 'Wall':
-            self.zoneCoord[:, :] = 1
-            self.zoneCoord[n//4 : 3*n//4, n//4 : 3*n//4] = 2
-
-        # print(self.zoneCoord)
+            self.zoneCoord[:, :] = 1  # Periphery
+            wall = int(np.ceil(min(nX, nY) / 4))
+            self.zoneCoord[wall : -wall, wall : -wall] = 2  # Center
 
         self.updateMapZones()
         self.numZones = 0
@@ -267,8 +283,8 @@ class MapWidget(QLabel):
         elif buttonType == 'Row':
             self.zoneCoord[x,:] = zoneValue
         elif buttonType == 'Square':
-            self.zoneCoord[[s, -s-1], s:self.numLasers-s] = zoneValue
-            self.zoneCoord[s:self.numLasers-s, [s, -s-1]] = zoneValue
+            self.zoneCoord[[s, -s-1], s:self.numLasersX-s] = zoneValue
+            self.zoneCoord[s:self.numLasersY-s, [s, -s-1]] = zoneValue
 
         # If all new areas were unchecked - do not allow adding empty zone
         if not checked and self.numZones + 1 not in self.zoneCoord:
@@ -287,13 +303,14 @@ class MapWidget(QLabel):
         self.cellMapLayout = QGridLayout(self.cellMap)
         self.cellMapLayout.setSpacing(0)
         self.cellMapLayout.setContentsMargins(0, 0, 0, 0)
+        # self.cellMapLayout.setSizeConstraint(QLayout.SetMaximumSize)
         self.cellMapButtons = []
 
-        for i in range(self.numLasers):
+        for i in range(self.numLasersY):
             self.cellMapButtons.append([])
-            for j in range(self.numLasers):
+            for j in range(self.numLasersX):
                 self.cellMapButtons[i].append(MapButton('', self))
-                self.cellMapButtons[i][j].setFixedSize(self.cell, self.cell)
+                self.cellMapButtons[i][j].setFixedSize(self.cellX, self.cellY)
                 self.cellMapButtons[i][j].setCheckable(True)
                 self.cellMapLayout.addWidget(self.cellMapButtons[i][j], i, j)
                 self.cellMapButtons[i][j].toggled.connect(
@@ -313,9 +330,9 @@ class MapWidget(QLabel):
         self.columnMapLayout.setContentsMargins(0, 0, 0, 0)
         self.columnMapButtons = []
 
-        for i in range(self.numLasers):
+        for i in range(self.numLasersX):
             self.columnMapButtons.append(MapButton('', self))
-            self.columnMapButtons[i].setFixedSize(self.cell, self.mapSide)
+            self.columnMapButtons[i].setFixedSize(self.cellX, self.mapSideY)
             self.columnMapButtons[i].setCheckable(True)
             self.columnMapLayout.addWidget(self.columnMapButtons[i])
             self.columnMapButtons[i].toggled.connect(
@@ -335,9 +352,9 @@ class MapWidget(QLabel):
         self.rowMapLayout.setContentsMargins(0, 0, 0, 0)
         self.rowMapButtons = []
 
-        for i in range(self.numLasers):
+        for i in range(self.numLasersY):
             self.rowMapButtons.append(MapButton('', self))
-            self.rowMapButtons[i].setFixedSize(self.mapSide, self.cell)
+            self.rowMapButtons[i].setFixedSize(self.mapSideX, self.cellY)
             self.rowMapButtons[i].setCheckable(True)
             self.rowMapLayout.addWidget(self.rowMapButtons[i])
             self.rowMapButtons[i].toggled.connect(
@@ -357,18 +374,34 @@ class MapWidget(QLabel):
         self.squareMapLayout.setContentsMargins(0, 0, 0, 0)
         self.squareMapButtons = []
 
-        for i in range(8):
-            self.squareMapButtons.append(MapButton('', self))
-            self.squareMapButtons[i].setFixedSize(self.mapSide, self.mapSide)
-            self.squareMapButtons[i].setCheckable(True)
+        nX = self.numLasersX
+        nY = self.numLasersY
 
-            #TODO Add sys._MEIPASS here to package into one file
-            pixmap = QPixmap(os.path.join('Area_pixmaps', f'{i+1}.png'))
-            self.squareMapButtons[i].setMask(pixmap.scaled(self.squareMapButtons[i].size(),
-                                                    Qt.IgnoreAspectRatio).mask())
-            self.squareMapLayout.addWidget(self.squareMapButtons[i], 0, 0)
-            self.squareMapButtons[i].toggled.connect(
-                lambda checked, i=i:
+        numSquares = int(np.ceil(min(nX, nY) / 2))
+
+        for s in range(numSquares):
+            self.squareMapButtons.append(MapButton('', self))
+            self.squareMapButtons[s].setFixedSize(self.mapSideX, self.mapSideY)
+            self.squareMapButtons[s].setCheckable(True)
+
+            # Make bitmap for the button's mask
+            bitmap = np.zeros((nY, nX), dtype=np.uint8)
+            bitmap[[s, -s-1], s:nX-s] = 1
+            bitmap[s:nY-s, [s, -s-1]] = 1
+            # Make 32-aligned to convert to QImage
+            bitmap = np.pad(bitmap, ((0, 0), (0, (4 - bitmap.shape[1] % 4) % 4)),
+                            mode='constant', constant_values=0)
+            # Convert to QPixmap through QImage
+            image = QImage(bitmap, nX, nY, QImage.Format.Format_Alpha8)
+            pixmap = QPixmap(image)
+
+            # Apply mask
+            self.squareMapButtons[s].setMask(pixmap.scaled(
+                self.squareMapButtons[s].size(), Qt.IgnoreAspectRatio).mask())
+
+            self.squareMapLayout.addWidget(self.squareMapButtons[s], 0, 0)
+            self.squareMapButtons[s].toggled.connect(
+                lambda checked, i=s:
                     self.mapBtnToggled(checked=checked, s=i))
 
         return self.squareMap
@@ -378,8 +411,9 @@ class MapWidget(QLabel):
 
         ''' Create area type buttons, arranged vertically to the left of the map '''
 
-        numAreaBtn = len(self.areaBtnIdx)
-        size = int(self.mapSide / (numAreaBtn * 1.5))
+        # numAreaBtn = len(self.areaBtnIdx)
+        # size = int(self.mapSideY / (numAreaBtn * 1.5))
+        size = 30
 
         self.areaBtnGroup = QButtonGroup()
         self.areaTypeBtnLayout = QVBoxLayout()
@@ -483,7 +517,7 @@ class MapWidget(QLabel):
         self.areaBtnIdx = {i: k for i, k
                            in enumerate(self.customAreas + self.predefinedAreas)}
 
-        self.mapLayout = QStackedLayout()
+        self.mapLayout = QStackedLayout(self)
 
         for idx, name in self.areaBtnIdx.items():
             # Create custom area map buttons with separate methods,

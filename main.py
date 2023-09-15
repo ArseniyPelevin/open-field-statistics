@@ -46,17 +46,19 @@ class MainWindow(QMainWindow):
     def setVariables(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        #TODO delete individual parameters to add global settings
-        self.params = {'numLasers': 16,     # On one side
-                       'mapSide': 320,      # px
-                       'boxSide': 40,       # cm
-                       'numStatParam': 5}   # Time, distance, velocity,
+        self.params = {'numLasersX': 16,
+                       'numLasersY': 16,
+                       'boxSideX': 40,      # Physical dimensions of the filed, cm
+                       'boxSideY': 40,
+                       'mapSideY': 320,     # px, mapSideX is calculated
+                                            # from box sides ratio
+                       'numStatParam': 5,   # Time, distance, velocity,
                                             # rearings number, rearings time
-        # self.mapSide = min(self.height(), self.width()/2) * 2/3
+                       # For temporal compatibility. To be deleted later
+                       'numLasers': 16,
+                       'boxSide': 40}
 
-        # Make MapSide divisible by numLasers
-        if self.params['mapSide'] % self.params['numLasers'] != 0:
-            self.params['mapSide'] -= self.params['mapSide'] % self.params['numLasers']
+        # self.mapSide = min(self.height(), self.width()/2) * 2/3
 
         self.numStatParam = self.params['numStatParam']
         self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
