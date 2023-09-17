@@ -4,10 +4,11 @@ from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtCore import Qt
 
 class Colors():
-    #TODO Expand zoneCoolors to allow more zones
     zoneColors = [(255, 255, 255),
-                  (255, 0, 0), (0, 255, 0), (0, 0, 255), (100, 0, 100),
-                  (255, 255, 255)]  # Blanck, when max number of zones 4 is reached
+                  (255, 0, 0), (0, 255, 0), (0, 0, 255),  # Zones 1-3
+                   (255, 128, 32), (240, 50, 230), (64, 255, 255),  # Zones 4-6
+                   (255, 255, 0), (128, 0, 128), (128, 128, 128),  # Zones 7-9
+                   (170, 110, 40),]  # Zone 10
     color = [', '.join(map(str, color)) for color in zoneColors]
 
     @classmethod
@@ -18,12 +19,8 @@ class Colors():
                 background-color: transparent;
             }}
 
-            QPushButton:hover {{
+            QPushButton:hover:!checked {{
                 background-color: rgba({cls.color[zone+1]}, 0.1);
-            }}
-
-            QPushButton:pressed {{
-                background-color: rgba({cls.color[zone+1]}, 0.3);
             }}
             ''')
 

@@ -16,7 +16,6 @@ from PyQt6.QtGui import (
 
 import superqt
 
-#TODO Expand zoneCoolors to allow more zones
 from ColorStyle import Colors
 
 class MapWidget(QLabel):
@@ -163,6 +162,7 @@ class MapWidget(QLabel):
 
         ''' A new area button was checked '''
 
+        # Prevent this method from execution after unchecking an area type button
         if not checked:
             return
 
@@ -189,16 +189,12 @@ class MapWidget(QLabel):
         '''
         Add a new zone to map and table from two sources:
             - user-defined area with map buttons:
-                fillTable=True, numNewZones=1
-            - two predefined areas:
-                fillTable=False, numNewZones=2
+                numNewZones=1
+            - predefined areas:
+                numNewZones = 2 or 3
         '''
 
         for i in range(numNewZones):
-
-            #TODO To make more zones delete it
-            if self.numZones == 4:                 # Maximum 4 zones
-                return
             self.numZones += 1
 
             # Add new table column
@@ -206,25 +202,37 @@ class MapWidget(QLabel):
             num = self.table.columnCount()
             self.table.setColumnCount(num + 1)
             self.table.setHorizontalHeaderItem(num, header)
-            # app.processEvents()
-            # self.adjustSize()
+
+        # Uncheck all map buttons, update table
+        self.updateZoneNumber()
+
+        # Maximum 10 zones
+        if self.numZones >= 10:
+            # Disable map buttons
+            self.mapLayout.currentWidget().hide()
+            return
+
+    def updateZoneNumber(self):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
+        ''' Uncheck all map buttons, disable 'New zone' button, update table '''
 
         # Do not allow to add empty zone before a new area is selected
         self.addZoneBtn.setDisabled(True)
 
-        self.table.fillTable()
-
         # Loop through all map buttons in all map layouts and uncheck them
         for i in range(self.mapLayout.count()):
             layout = self.mapLayout.widget(i).layout()
-            for i in range(layout.count()):
-                button = layout.itemAt(i).widget()
+            for j in range(layout.count()):
+                button = layout.itemAt(j).widget()
+                # Uncheck 'em quietly
                 button.blockSignals(True)
                 button.setChecked(False)
                 button.blockSignals(False)
 
+        self.table.fillTable()
+        self.adjustSize()
         self.setStyleSheet(Colors.styleSheet(self.numZones))
-        # self.adjustSize()
 
     def fillPredefinedZones(self, newBtn):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -271,19 +279,16 @@ class MapWidget(QLabel):
         Signals are defined in each area type method
         '''
 
-        buttonType = self.areaBtnIdx[self.areaBtnGroup.checkedId()]
-        #TODO To make more zones delete it
-        if self.numZones == 4:
+        # Maximum 10 zones
+        if self.numZones >= 10:
             return
 
-        if checked:
-            # Assign area coordinated to the index of the next zone
-            zoneValue = self.numZones + 1
-            # Allow to add a new zone after some area was selected
-            self.addZoneBtn.setEnabled(True)
-        else:
-            # Exclude unchecked area from any zone
-            zoneValue = 0
+        buttonType = self.areaBtnIdx[self.areaBtnGroup.checkedId()]
+
+        # Assign area coordinates to the index of the next zone
+        zoneValue = self.numZones + 1
+        # Allow to add a new zone after some area was selected
+        self.addZoneBtn.setEnabled(True)
 
         # Assign the area checked with a custom button to the new zone
         if buttonType == 'Cell':
@@ -295,12 +300,6 @@ class MapWidget(QLabel):
         elif buttonType == 'Square':
             self.zoneCoord[[s, -s-1], s:self.numLasersX-s] = zoneValue
             self.zoneCoord[s:self.numLasersY-s, [s, -s-1]] = zoneValue
-
-        # If all new areas were unchecked - do not allow adding empty zone
-        if not checked and self.numZones + 1 not in self.zoneCoord:
-            self.addZoneBtn.setEnabled(False)
-
-        # print(self.zoneCoord)
 
         self.updateMapZones()
 
@@ -483,26 +482,17 @@ class MapWidget(QLabel):
     def clearMap(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-
         self.numZones = 0
         self.table.setColumnCount(1)
-        self.table.setFixedWidth(self.table.tableWidth())
 
+        # Deselect all map areas
         self.zoneCoord[:, :] = 0
         self.updateMapZones()
-        self.setStyleSheet(Colors.styleSheet(self.numZones))
-        # self.adjustSize()
 
-        # Loop through all map buttons in all map layouts and uncheck them
-        for i in range(self.mapLayout.count()):
-            layout = self.mapLayout.widget(i).layout()
-            for i in range(layout.count()):
-                button = layout.itemAt(i).widget()
-                button.blockSignals(True)
-                button.setChecked(False)
-                button.blockSignals(False)
+        # Uncheck all map buttons, update table
+        self.updateZoneNumber()
 
-        # Set Cell (id = 0) - the default area type
+        # Set Cell (id = 0) as the default area type
         self.areaBtnGroup.button(0).setChecked(True)
 
     def defineAreaTypes(self):
@@ -540,6 +530,7 @@ class MapWidget(QLabel):
         self.makeAreaButtons()
 
     def mousePressEvent(self, event):
+        # Starting position of drag-select rubber band
         self.startPoint = event.position().toPoint()
 
     def mouseMoveEvent(self, event):
@@ -547,6 +538,7 @@ class MapWidget(QLabel):
         if self.currentAreaType in self.predefinedAreas:
             return
 
+        # Current end position of drag-select rubber band
         endPoint = event.position().toPoint()
         rect = QRect(self.startPoint, endPoint).normalized()
 
@@ -558,7 +550,7 @@ class MapWidget(QLabel):
         if self.currentAreaType in self.predefinedAreas:
             return
 
-        # Important to get endPoint here for click-selection case!
+        # Important to also get endPoint here for click-selection case!
         endPoint = event.position().toPoint()
         rect = QRect(self.startPoint, endPoint).normalized()
 
