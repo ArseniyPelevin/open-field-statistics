@@ -1,6 +1,7 @@
 import inspect
 import os
 import numpy as np
+import pandas as pd
 
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QPushButton, QButtonGroup,
@@ -11,7 +12,7 @@ from PyQt6.QtCore import (
     Qt, pyqtSlot, QPoint, QPointF, QRect, QLineF
     )
 from PyQt6.QtGui import (
-    QIcon, QPixmap, QImage, QPainter, QPen, QColor
+    QIcon, QPixmap, QImage, QPainter, QPen, QColor, QPolygonF
 )
 
 import superqt
@@ -25,7 +26,6 @@ class MapWidget(QLabel):
         super().__init__()
 
         self.window = window
-        # self.time = None
         self.table = None
 
         # self.numLasers = self.window.params['numLasers']
@@ -129,33 +129,54 @@ class MapWidget(QLabel):
 
         self.updateMap()
 
-    def updateMapPath(self, iStart, iEnd):
+    # def updateMapPath(self, iStart, iEnd): #!!!
+    def updateMapPath(self, df, start, end):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         ''' Draw path in Selected time '''
+
+        start = pd.to_timedelta(start, unit='s')
+        end = pd.to_timedelta(end, unit='s')
 
         self.pathLayer.fill(Qt.transparent)
 
         pathPainter = QPainter(self.pathLayer)
 
         pathPainter.setPen(QPen(Qt.red, 2))
-        pathPainter.drawPolyline(self.pathPoints[iStart:iEnd])
+        # pathPainter.drawPolyline(self.pathPoints[iStart:iEnd])
+        # pathPainter.drawPolyline(self.makePath[iStart:iEnd])
+        pathPainter.drawPolyline(self.makePath(df[start:end]))
 
         pathPainter.end()
 
         self.updateMap()
 
-    def makePath(self, data):
+    def makePath(self, df):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         ''' Make array of path QPoints for visualization '''
 
-        self.pathPoints = []
-        for _, row in data.iterrows():
-            x = row['x'] * self.cellX - self.cellX / 2
-            y = row['y'] * self.cellY - self.cellY / 2
-            self.pathPoints.append(QPointF(x, y))
-        self.pathPoints = np.array(self.pathPoints)
+        # self.pathPoints = []
+        # for _, row in data.iterrows():
+        #     x = row['x'] * self.cellX - self.cellX / 2
+        #     y = row['y'] * self.cellY - self.cellY / 2
+        #     self.pathPoints.append(QPointF(x, y))
+        # self.pathPoints = np.array(self.pathPoints)
+
+        size = df.shape[0]
+        polyline = QPolygonF([QPointF(0, 0)] * size)
+        buffer = polyline.data()
+        buffer.setsize(2 * 8 * size)
+        memory = np.frombuffer(buffer, np.float64)
+        memory[:] = (pd
+                     .concat([df['x'] * self.cellX,# - self.cellX / 2,
+                             df['y'] * self.cellY],# - self.cellY / 2],
+                             axis=1
+                             )
+                     .to_numpy().flatten()
+                     )
+
+        return polyline
 
     def newAreaButton(self, newBtnId, checked):
         print(__name__, inspect.currentframe().f_code.co_name)

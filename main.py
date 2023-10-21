@@ -14,7 +14,9 @@ from PyQt6.QtGui import QFontMetrics, QIcon
 
 from superqt import QRangeSlider
 
-from DataProcessing import DataProcessing
+# from DataProcessing import DataProcessing
+from DataProcessing_pandas import DataProcessing_pandas #!!!
+
 from Map import MapWidget
 from Time import TimePeriodSettings
 from Table import TableWidget
@@ -54,7 +56,7 @@ class MainWindow(QMainWindow):
                                             # from box sides ratio
                        'numStatParam': 5,   # Time, distance, velocity,
                                             # rearings number, rearings time
-                       # For temporal compatibility. To be deleted later
+                       # For temporal compatibility. To be deleted later #!!!
                        'numLasers': 16,
                        'boxSide': 40}
 
@@ -119,35 +121,44 @@ class MainWindow(QMainWindow):
         ''' Load raw data file, get statistics, update map and table '''
 
         #TODO Remember file location
-        self.inputFileName, _filter = QFileDialog.getOpenFileName(self,
+        inputFileName, _filter = QFileDialog.getOpenFileName(self,
                               caption='Open .csv file',
                               directory=r'C:\OpenField',
                               filter='CSV files (*.csv)')
         # The extarnal program that generates the raw data saves
         # .csv files to C:\OpenField by default, thus predefined location
 
+        # Define backend class instance
+        self.stat = DataProcessing_pandas(self.params, self.map.zoneCoord)
+
         # Create pandas dataframe and process it
         try:
-            self.csv_df = pd.read_csv(self.inputFileName, delimiter=';')
+            # self.csv_df = pd.read_csv(self.inputFileName, delimiter=';')
+            self.stat.read(inputFileName) #!!!
         except FileNotFoundError:
             return
 
-        self.stat = DataProcessing(self.csv_df, self.params)
-        self.time.stat = self.stat
 
+
+        # self.stat = DataProcessing(self.csv_df, self.params)
+
+        self.time.stat = self.stat
+        # self.time.updateTimeVariables(self.stat.data)
         self.time.updateTimeVariables(self.stat)
 
         # Set file name label
         metrix = QFontMetrics(self.fileNameLabel.font())
         width = self.fileNameLabel.width() - 2;
-        clippedText = metrix.elidedText(self.inputFileName, Qt.ElideMiddle, width)
+        clippedText = metrix.elidedText(inputFileName, Qt.ElideMiddle, width)
         self.fileNameLabel.setText(clippedText)
 
         # Make path for visualization
-        self.map.makePath(self.stat.data)
+        # self.map.makePath(self.stat.data)
 
         # Update window
-        self.map.updateMapPath(0, self.stat.data.index[-1])
+        # self.map.updateMapPath(0, self.stat.data.index[-1])
+        self.map.updateMapPath(self.stat.df,
+                               self.time.startSelected, self.time.endSelected)
         self.table.fillTable()
         self.saveButton.setEnabled(True)
 

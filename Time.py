@@ -28,7 +28,6 @@ class TimePeriodSettings:
 
         self.window = window
         self.map = self.window.map
-        # self.map.time = self
         self.table = None
 
 
@@ -99,13 +98,17 @@ class TimePeriodSettings:
     def updateTimeVariables(self, stat):
         print(__name__, inspect.currentframe().f_code.co_name)
 
+        ''' Set time variables based on loaded raw data '''
+
         self.stat = stat
+        self.data = self.stat.data
         # Update variables
         self.startSelected = 0
-        self.endSelected = self.stat.totalTime
+        self.totalTime = self.data.loc[("Total_time", "time"), "Whole_field"]
+        self.endSelected = self.totalTime
         self.selectedTime = self.endSelected
         self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
-        self.period = self.stat.totalTime
+        self.period = self.totalTime
         self.numPeriods = 0
 
         self.setTimeRange()
@@ -117,8 +120,8 @@ class TimePeriodSettings:
         ''' Set selected time range based on loaded raw data '''
 
         sliderStep = 0.1   # Step of selected time range slider in seconds
-        self.timeRangeSlider.setRange(0, self.stat.totalTime / sliderStep)
-        self.timeRangeSlider.setValue([0, self.stat.totalTime / sliderStep])
+        self.timeRangeSlider.setRange(0, self.totalTime / sliderStep)
+        self.timeRangeSlider.setValue([0, self.totalTime / sliderStep])
 
         self.startTime.setEnabled(True)
         self.endTime.setEnabled(True)
@@ -126,8 +129,9 @@ class TimePeriodSettings:
         self.periodLine.setEnabled(True)
 
         self.startTime.setText(str(0))
-        self.endTime.setText(str(self.stat.totalTime))
+        self.endTime.setText(str(self.totalTime))
 
+#??? Delete this method alltogether?
     def selectedStatistics(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
@@ -142,10 +146,11 @@ class TimePeriodSettings:
         start = float(self.startTime.text())
         end = float(self.endTime.text())
 
-        iStart = self.stat.timeIndex(start)
-        iEnd = self.stat.timeIndex(end)
+#!!!
+        # iStart = self.stat.timeIndex(start)
+        # iEnd = self.stat.timeIndex(end)
 
-        if start == 0 and end == self.stat.totalTime:
+        if start == 0 and end == self.totalTime:
             self.hasSelectedStat = False
         else:
             headersSelected = [QTableWidgetItem
@@ -165,7 +170,8 @@ class TimePeriodSettings:
         self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
         self.updatePeriod()
 
-        self.map.updateMapPath(iStart, iEnd)
+        # self.map.updateMapPath(iStart, iEnd)
+        self.map.updateMapPath(self.stat.df, start, end) #??? Passing df here?
 
     def updatePeriod(self, period=0, isUsersPeriod=False):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -222,10 +228,12 @@ class TimePeriodSettings:
         self.startTime.setText(str(start))
         self.endTime.setText(str(end))
 
-        iStart = self.stat.timeIndex(start)
-        iEnd = self.stat.timeIndex(end)
+#!!!
+        # iStart = self.stat.timeIndex(start)
+        # iEnd = self.stat.timeIndex(end)
 
-        self.map.updateMapPath(iStart, iEnd)
+        # self.map.updateMapPath(iStart, iEnd)
+        self.map.updateMapPath(self.stat.df, start, end) #??? Passing df here?
 
     def textUpdateTimeRange(self, start, end):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -313,11 +321,11 @@ class TimePeriodSettings:
             end = float(self.endTime.text())
         # Empty line was entered as end time, set end to max total time
         except ValueError:
-            end = self.stat.totalTime
+            end = self.totalTime
             self.endTime.setText(str(end))
         else:
             errorMessage = ('End time should be in the range:\n'
-                            + f'{self.startSelected} < end time <= {self.stat.totalTime}')
+                            + f'{self.startSelected} < end time <= {self.totalTime}')
 
             # Selected end < Selected start, back to previous value
             if end <= self.startSelected:
@@ -327,10 +335,10 @@ class TimePeriodSettings:
                 self.endTime.setText(str(end))
 
             # Selected end > total time, set Selected time to max total time
-            elif end > self.stat.totalTime:
+            elif end > self.totalTime:
                 self.errorWarning(self.endTime, errorMessage)
 
-                end = self.stat.totalTime
+                end = self.totalTime
                 self.endTime.setText(str(end))
 
         self.textUpdateTimeRange(self.startSelected, end)

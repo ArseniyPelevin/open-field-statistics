@@ -10,12 +10,13 @@ class DataProcessing_pandas():
         self.params = params
         self.zoneCoord = zoneCoord
 
-        self.read()  # !!! temp
+        # self.read()  # !!! temp
 
-    def read(self, file='C:\OpenField\Rat_1.csv'):
+    def read(self, file):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        df = pd.read_csv(file,
+        self.df = (pd
+                   .read_csv(file,
                          sep=None,   # Uses 'csv.Sniffer' for decimal separator,
                          # needs python engine
                          engine='python',
@@ -24,8 +25,9 @@ class DataProcessing_pandas():
                          names=['time', 'x1', 'x2', 'y1', 'y2', 'z'], header=0,
                          index_col=0
                          )
-        self.df = self.process_raw_data(df)
-
+                   .pipe(self.process_raw_data)
+                   )
+        self.data = self.get_data(self.df)
 
 # %%
 
@@ -35,6 +37,8 @@ class DataProcessing_pandas():
         # Exclude rows with any of four coordinates missing
 #TODO Let user define this behavior in Settings (Start of recording/First beam break)
         df = df.loc[(df.loc[:, 'x1':'y2'] != 0).all(axis=1)]
+
+
 
         # Absolute timestamps to timedeltas since start
         df.index -= df.index[0]
@@ -57,7 +61,7 @@ class DataProcessing_pandas():
 
         # Lasers are indexed 1-16 and correspond to centers of cells
         # Change to Euclidean coordinates
-        df['x'] -= 0.5
+        df['x'] = df['x'] - 0.5
         df['y'] -= 0.5
 
         # Distance by each axis
@@ -95,17 +99,25 @@ class DataProcessing_pandas():
 
     # %%
 
-    def get_data(self, df):
+    def get_data(self, df, time_params=None):
         print(__name__, inspect.currentframe().f_code.co_name)
 
+        if time_params:
+            start, end, period = time_params
+            # grouper = pd.Grouper(level='time',
+            #                      freq=period,
+            #                      origin='start',
+            #                      closed='left'
+            #                      )
+        else:
+            start = 0
+            end = df.index[-1].total_seconds()
+            # Add 0.1 s to include the whole time range in the default period
+            period = end + 0.1
+            # grouper = None
 
-
-        # %% #!!! temp
-        start = 246.8  # seconds
-        end = 911  # seconds
-        period = 300  # seconds
-
-        #%%
+        # To access from other modules
+        # self.start, self.end, self.period = start, end, period #???
 
 #TODO mention this behavior in documentation
         # Make periods' index in the format 'period_start—period_end'
@@ -132,7 +144,10 @@ class DataProcessing_pandas():
 
         grouper = pd.Grouper(level='time',
                              freq=period,
-                             origin='start')
+                             origin='start',
+                             closed='left'
+                             )
+
         # Aggregate data for each period/zone (within Selected_time)
         data = (df
                 .loc[start:end]
@@ -141,7 +156,7 @@ class DataProcessing_pandas():
                 )
         # Aggregate data outside of selected_time
         data.loc['_not_selected'] = (pd
-                                     .concat([df.loc[:start], df.loc[end:]])
+                                     .concat([df.loc[:start-'0.1s'], df.loc[end+'0.1s':]])
                                      .pipe(self.pivot_zone_wise, None)
                                      .unstack().swaplevel()
                                      )
@@ -181,13 +196,17 @@ class DataProcessing_pandas():
                              ['Total_time', 'Selected_time'] + periods_index,
                              ['time', 'dist', 'vel', 'z_num', 'z_time']])
                          )
-                .rename(index={'time': 'Time (s)',
-                               'dist': 'Distance (cm)',
-                               'vel': 'Velocity (cm/s)',
-                               'z_num': 'Rearings number',
-                               'z_time': 'Rearings time (s)'},
-                        level=1)
+                # .rename(index={'time': 'Time (s)',
+                #                'dist': 'Distance (cm)',
+                #                'vel': 'Velocity (cm/s)',
+                #                'z_num': 'Rearings number',
+                #                'z_time': 'Rearings time (s)'},
+                        # level=1)
                 )
+
+        #???
+        print(f'Test total time:\nEnd-start: {df.index[-1].total_seconds()}\n' +
+              f'Total_time/Whole_field: {data.loc[("Total_time", "time"), "Whole_field"]}')
 
         return data
 
@@ -223,10 +242,4 @@ def save(data, file=r'Trials\Test_pandas_output_2.csv'):
         data.to_csv(output, sep=';', decimal='.')
 
 
-stat = DataProcessing_pandas(*temp_args())
-data = stat.get_data(stat.df)
-save(data)
-
-
-# stats = ['dt', 'dist', 'z_num', 'z']
-# %%
+# stat = DataProcessing_pandas(*temp_args())
