@@ -32,7 +32,8 @@ class MapWidget(QLabel):
         self.numLasersX = 16
         self.numLasersY = 16
 
-        self.mapSideY = self.window.params['mapSideY']
+        # self.mapSideY = self.window.params['mapSideY']#!!!
+        self.mapSideY = 320 #???
         self.mapSideX = int(self.mapSideY *
                           self.window.params['boxSideX'] / self.window.params['boxSideY'])
 
@@ -130,7 +131,7 @@ class MapWidget(QLabel):
         self.updateMap()
 
     # def updateMapPath(self, iStart, iEnd): #!!!
-    def updateMapPath(self, df, start, end):
+    def updateMapPath(self, start, end):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         ''' Draw path in Selected time '''
@@ -145,7 +146,7 @@ class MapWidget(QLabel):
         pathPainter.setPen(QPen(Qt.red, 2))
         # pathPainter.drawPolyline(self.pathPoints[iStart:iEnd])
         # pathPainter.drawPolyline(self.makePath[iStart:iEnd])
-        pathPainter.drawPolyline(self.makePath(df[start:end]))
+        pathPainter.drawPolyline(self.makePath(self.stat.df[start:end]))
 
         pathPainter.end()
 
@@ -251,7 +252,10 @@ class MapWidget(QLabel):
                 button.setChecked(False)
                 button.blockSignals(False)
 
-        self.table.fillTable()
+        # self.table.fillTable() #!!!
+        timeParams = (self.time.start, self.time.end, self.time.period)
+        self.stat.get_data(timeParams)
+        self.table.model.layoutChanged.emit()
         self.adjustSize()
         self.setStyleSheet(Colors.styleSheet(self.numZones))
 

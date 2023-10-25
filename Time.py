@@ -31,7 +31,7 @@ class TimePeriodSettings:
         self.table = None
 
 
-        self.numStatParam = self.window.numStatParam
+        self.numStatParam = len(self.window.params['statParams'])
         self.hasSelectedStat = False
 
         self.setTimeWidgets()
@@ -141,7 +141,7 @@ class TimePeriodSettings:
         except for Total time statistics
         '''
 
-        n = self.numStatParam
+        # n = self.numStatParam
 
         start = float(self.startTime.text())
         end = float(self.endTime.text())
@@ -150,19 +150,19 @@ class TimePeriodSettings:
         # iStart = self.stat.timeIndex(start)
         # iEnd = self.stat.timeIndex(end)
 
-        if start == 0 and end == self.totalTime:
-            self.hasSelectedStat = False
-        else:
-            headersSelected = [QTableWidgetItem
-                               (f'Selected time {start}-{end} s,\n{header}')
-                               for header in self.table.verticalHeaders]
-            for i in range(n):
-                # If there was Selected time statistics before - delete it
-                if self.hasSelectedStat:
-                    self.table.removeRow(n + i)
-                self.table.insertRow(n + i)
-                self.table.setVerticalHeaderItem(n + i, headersSelected[i])
-            self.hasSelectedStat = True
+        # if start == 0 and end == self.totalTime:
+        #     self.hasSelectedStat = False
+        # else:
+        #     headersSelected = [QTableWidgetItem
+        #                        (f'Selected time {start}-{end} s,\n{header}')
+        #                        for header in self.table.verticalHeaders]
+        #     for i in range(n):
+        #         # If there was Selected time statistics before - delete it
+        #         if self.hasSelectedStat:
+        #             self.table.removeRow(n + i)
+        #         self.table.insertRow(n + i)
+        #         self.table.setVerticalHeaderItem(n + i, headersSelected[i])
+        #     self.hasSelectedStat = True
 
         self.startSelected = start
         self.endSelected = end
@@ -171,7 +171,7 @@ class TimePeriodSettings:
         self.updatePeriod()
 
         # self.map.updateMapPath(iStart, iEnd)
-        self.map.updateMapPath(self.stat.df, start, end) #??? Passing df here?
+        self.map.updateMapPath(start, end) #??? Passing df here?
 
     def updatePeriod(self, period=0, isUsersPeriod=False):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -185,37 +185,42 @@ class TimePeriodSettings:
         '''
 
         # Period statistics goes after Total time and Selected time in table
-        n = self.numStatParam
-        self.table.setRowCount(n + n * self.hasSelectedStat)
+        # n = self.numStatParam
+        # self.table.setRowCount(n + n * self.hasSelectedStat)
 
         # Period is not defined
         if period == 0 or period == self.selectedTime or not isUsersPeriod:
             self.period = self.selectedTime  # Default value
             self.periodLine.setText('')
-            self.numPeriods = 0
-            self.periodTimes = []
-            self.table.fillTable()
-            return
+            # self.numPeriods = 0
+            # self.periodTimes = []
+            # self.table.fillTable() #!!!
+            # self.table.model.layoutChanged.emit()
+            # return
 
-        self.period = period
-        self.numPeriods = m.ceil(self.selectedTime / self.period)
-        self.periodTimes = []   # Start and end of each period
-                                # ! relative to Selected time !
-        for i in range(self.numPeriods):
-            timeStart = round(i * self.period, 1)
-            timeEnd = round((i+1) * self.period, 1)
-            if timeEnd > self.selectedTime:
-                timeEnd = self.selectedTime
-            self.periodTimes.append((timeStart, timeEnd))
-            numRows = self.table.rowCount()
-            self.table.setRowCount(numRows+n)
-            # For each period add empty rows for its statistics in table
-            for j in range(n):
-                self.table.setVerticalHeaderItem(numRows + j,
-                    QTableWidgetItem(f'{timeStart}-{timeEnd} s, '
-                                     + f'{self.table.verticalHeaders[j]}'))
+        # self.period = period
+        # self.numPeriods = m.ceil(self.selectedTime / self.period)
+        # self.periodTimes = []   # Start and end of each period
+        #                         # ! relative to Selected time !
+        # for i in range(self.numPeriods):
+        #     timeStart = round(i * self.period, 1)
+        #     timeEnd = round((i+1) * self.period, 1)
+        #     if timeEnd > self.selectedTime:
+        #         timeEnd = self.selectedTime
+        #     self.periodTimes.append((timeStart, timeEnd))
+        #     numRows = self.table.rowCount()
+        #     self.table.setRowCount(numRows+n)
+        #     # For each period add empty rows for its statistics in table
+        #     for j in range(n):
+        #         self.table.setVerticalHeaderItem(numRows + j,
+        #             QTableWidgetItem(f'{timeStart}-{timeEnd} s, '
+        #                              + f'{self.table.verticalHeaders[j]}'))
 
-        self.table.fillTable()
+        # self.table.fillTable() #!!!
+
+        timeParams = (self.start, self.end, period)
+        self.stat.get_data(timeParams)
+        self.table.model.layoutChanged.emit()
 
     def sliderUpdateTimeRange(self, value):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -233,7 +238,7 @@ class TimePeriodSettings:
         # iEnd = self.stat.timeIndex(end)
 
         # self.map.updateMapPath(iStart, iEnd)
-        self.map.updateMapPath(self.stat.df, start, end) #??? Passing df here?
+        self.map.updateMapPath(start, end) #??? Passing df here?
 
     def textUpdateTimeRange(self, start, end):
         print(__name__, inspect.currentframe().f_code.co_name)

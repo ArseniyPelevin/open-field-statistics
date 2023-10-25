@@ -7,10 +7,11 @@ import inspect
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QStyleFactory, QFileDialog,
     QWidget, QLabel, QPushButton,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QSpacerItem
+    QVBoxLayout, QHBoxLayout, QGridLayout, QSpacerItem,
+    QMessageBox
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontMetrics, QIcon
+from PyQt6.QtGui import QFontMetrics, QIcon, QAction
 
 from superqt import QRangeSlider
 
@@ -19,7 +20,10 @@ from DataProcessing_pandas import DataProcessing_pandas #!!!
 
 from Map import MapWidget
 from Time import TimePeriodSettings
-from Table import TableWidget
+# from Table import TableWidget
+from Table import Table
+from Settings import Settings
+from Info import Info
 
 
 class MainWindow(QMainWindow):
@@ -34,36 +38,24 @@ class MainWindow(QMainWindow):
         # self.setMaximumSize(screen)
         self.setGeometry(100, 100, 100, 100)
 
-        self.setVariables()
+        # self.setVariables()
         self.setWidgets()
 
+        self.settings = Settings(self)
         self.map = MapWidget(self)
         # self.map.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.time = TimePeriodSettings(self)
-        self.table = TableWidget(self, app, rows=self.numStatParam, columns=1)
+        self.stat = DataProcessing_pandas(self.params, self.map.zoneCoord)
+        # self.table = TableWidget(self, app, rows=self.numStatParam, columns=1) #!!!
+        self.table = Table(self)
 
+        self.setMenu()
         self.setSignals()
         self.setLayouts()
 
-    def setVariables(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
-
-        self.params = {'numLasersX': 16,
-                       'numLasersY': 16,
-                       'boxSideX': 40,      # Physical dimensions of the filed, cm
-                       'boxSideY': 40,
-                       'mapSideY': 320,     # px, mapSideX is calculated
-                                            # from box sides ratio
-                       'numStatParam': 5,   # Time, distance, velocity,
-                                            # rearings number, rearings time
-                       # For temporal compatibility. To be deleted later #!!!
-                       'numLasers': 16,
-                       'boxSide': 40}
-
+    # def setVariables(self):
         # self.mapSide = min(self.height(), self.width()/2) * 2/3
 
-        self.numStatParam = self.params['numStatParam']
-        self.statParam = ['time', 'dist', 'vel', 'rear', 'rearTime']
 
     def setWidgets(self):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -75,6 +67,39 @@ class MainWindow(QMainWindow):
         self.saveButton = QPushButton('Save data')
         self.saveButton.setFixedWidth(80)
         self.saveButton.setDisabled(True)
+
+    def setMenu(self):
+
+        openData = QAction('Open raw data', self)
+        openParameters = QAction('Open parameters', self)
+        saveData = QAction('Save data', self)
+        saveParameters = QAction('Save parameters', self)
+        saveMap = QAction('Save map as image', self)
+
+        openData.triggered.connect(self.getFile)
+        openParameters.triggered.connect(lambda x: x)
+        saveData.triggered.connect(lambda x: x)
+        saveParameters.triggered.connect(lambda x: x)
+        saveMap.triggered.connect(lambda x: x)
+
+        settingsAction = QAction('Settings', self)
+        settingsAction.triggered.connect(self.settings.settingsDialog)
+
+        infoAction = QAction('Info', self)
+        infoAction.triggered.connect(lambda: Info(self))
+
+        menu = self.menuBar()
+
+        fileMenu = menu.addMenu('File')
+        fileMenu.addAction(openData)
+        fileMenu.addAction(openParameters)
+        fileMenu.addSeparator()
+        fileMenu.addAction(saveData)
+        fileMenu.addAction(saveParameters)
+        fileMenu.addAction(saveMap)
+
+        menu.addAction(settingsAction)
+        menu.addAction(infoAction)
 
     def setSignals(self):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -129,18 +154,14 @@ class MainWindow(QMainWindow):
         # .csv files to C:\OpenField by default, thus predefined location
 
         # Define backend class instance
-        self.stat = DataProcessing_pandas(self.params, self.map.zoneCoord)
 
         # Create pandas dataframe and process it
         try:
-            # self.csv_df = pd.read_csv(self.inputFileName, delimiter=';')
-            self.stat.read(inputFileName) #!!!
+            maxX, maxY = self.stat.read(inputFileName)
+            if maxX or maxY:
+                self.incorrectData(maxX, maxY)
         except FileNotFoundError:
             return
-
-
-
-        # self.stat = DataProcessing(self.csv_df, self.params)
 
         self.time.stat = self.stat
         # self.time.updateTimeVariables(self.stat.data)
@@ -159,24 +180,48 @@ class MainWindow(QMainWindow):
         # self.map.updateMapPath(0, self.stat.data.index[-1])
         self.map.updateMapPath(self.stat.df,
                                self.time.startSelected, self.time.endSelected)
-        self.table.fillTable()
+
+        # self.table.fillTable() #!!!
+        self.stat.get_data()
+        self.table.model.layoutChanged.emit()
+
         self.saveButton.setEnabled(True)
 
-    '''
-    def resizeEvent(self, e):
-        # try:
-            availableHeight = self.height() \
-                - sum([self.controlLayout.rowMinimumHeight(row)
-                        for row in [0, 1, 4, 5]])
-            print(self.controlLayout.rowMinimumHeight(5))
-            availableWidth = 600 #self.width() - (self.tableWidth()
-                                  # + self.controlLayout.columnMinimumWidth(0))
-            self.mapSide = (s := min(availableHeight, availableWidth)) \
-                            - (s % self.numLasers)
-            self.drawMap()
-        except AttributeError:
-            raise
-    '''
+    def incorrectData(self, maxX, maxY):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
+        warningMessage = ('Loaded raw data do not correspond to the '
+                          + 'field parameters specified:\n\n')
+        if maxX:
+            warningMessage += (
+                'Number of beams by the horizontal (X) axis'
+                + f' is set to {self.params["numLasersX"]},\n'
+                + f'but the loaded raw data contain X values up to {maxX}.\n\n')
+        if maxY:
+            warningMessage += (
+                'Number of beams by the vertical (Y) axis'
+                + f' is set to {self.params["numLasersY"]},\n'
+                + f'but the loaded raw data contain Y values up to {maxY}.\n\n')
+        warningMessage += 'Change beam parameters or load another raw data file.'
+
+        QMessageBox.warning(self, 'Incorrect raw data', warningMessage)
+
+
+
+    # def resizeEvent(self, e):
+    #     # try:
+    #         availableHeight = self.height() \
+    #             - sum([self.controlLayout.rowMinimumHeight(row)
+    #                     for row in [0, 1, 4, 5]])
+    #         print(self.controlLayout.rowMinimumHeight(5))
+    #         availableWidth = 600 #self.width() - (self.tableWidth()
+    #                               # + self.controlLayout.columnMinimumWidth(0))
+    #         self.mapSide = (s := min(availableHeight, availableWidth)) \
+    #                         - (s % self.numLasers)
+    #         self.drawMap()
+    #     except AttributeError:
+    #         raise
+
 
 
 if __name__ == '__main__':
