@@ -20,7 +20,7 @@ from DataProcessing import DataProcessing
 from Map import MapWidget
 from Time import TimePeriodSettings
 # from Table import TableWidget
-from Table import Table
+from Table import TableView
 from Settings import Settings
 from Info import Info
 
@@ -40,13 +40,13 @@ class MainWindow(QMainWindow):
         # self.setVariables()
         self.setWidgets()
 
+        self.params = {}
         self.settings = Settings(self)
         self.map = MapWidget(self)
         # self.map.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.time = TimePeriodSettings(self)
-        self.stat = DataProcessing_pandas(self.params, self.map.zoneCoord)
-        # self.table = TableWidget(self, app, rows=self.numStatParam, columns=1) #!!!
-        self.table = Table(self)
+        self.stat = DataProcessing(self.params, self.map.zoneCoord)
+        self.table = TableView(self, app)
 
         self.setMenu()
         self.setSignals()
@@ -68,6 +68,7 @@ class MainWindow(QMainWindow):
         self.saveButton.setDisabled(True)
 
     def setMenu(self):
+        print(__name__, inspect.currentframe().f_code.co_name)
 
         openData = QAction('Open raw data', self)
         openParameters = QAction('Open parameters', self)
@@ -152,19 +153,24 @@ class MainWindow(QMainWindow):
         # The extarnal program that generates the raw data saves
         # .csv files to C:\OpenField by default, thus predefined location
 
-        # Define backend class instance
-
-        # Create pandas dataframe and process it
+        # Read pandas dataframe from file and preprocess it
         try:
             maxX, maxY = self.stat.read(inputFileName)
+            # Check if data correspond to field settings
             if maxX or maxY:
                 self.incorrectData(maxX, maxY)
+                return
         except FileNotFoundError:
             return
 
-        self.time.stat = self.stat
-        # self.time.updateTimeVariables(self.stat.data)
-        self.time.updateTimeVariables(self.stat)
+        # Update time variables based on loaded data
+        self.time.loadTimeVariables(self.stat)
+
+        # Get statistics and fill the table
+        self.table.fillTable()
+
+        # Update path on map
+        self.map.updateMapPath(self.params['startSelected'], self.params['endSelected'])
 
         # Set file name label
         metrix = QFontMetrics(self.fileNameLabel.font())
@@ -172,19 +178,7 @@ class MainWindow(QMainWindow):
         clippedText = metrix.elidedText(inputFileName, Qt.ElideMiddle, width)
         self.fileNameLabel.setText(clippedText)
 
-        # Make path for visualization
-        # self.map.makePath(self.stat.data)
-
-        # Update window
-        # self.map.updateMapPath(0, self.stat.data.index[-1])
-        self.map.updateMapPath(self.stat.df,
-                               self.time.startSelected, self.time.endSelected)
-
-        # self.table.fillTable() #!!!
-        self.stat.get_data()
-        self.table.model.layoutChanged.emit()
-
-        self.saveButton.setEnabled(True)
+        self.saveButton.setEnabled(True) #??? Disable save actions in menu bar
 
     def incorrectData(self, maxX, maxY):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -205,7 +199,10 @@ class MainWindow(QMainWindow):
 
         QMessageBox.warning(self, 'Incorrect raw data', warningMessage)
 
+    def closeEvent(self, event):
+        print(__name__, inspect.currentframe().f_code.co_name)
 
+        self.settings.saveRecentParameters()
 
     # def resizeEvent(self, e):
     #     # try:

@@ -35,9 +35,11 @@ class Delegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         super().paint(painter, option, index)
 
+        numStatParam = len(self.window.params['statParams'])
+
         # Overlap of colored zone and gray even block
         if index.column() != 0 and \
-           (index.row() // self.window.numStatParam) % 2 == 1:
+           (index.row() // numStatParam) % 2 == 1:
             color = self.overlap(np.array([120, 120, 120, 120]),  # gray
                                  np.array([*Colors.zoneColors[index.column()], 80]))
         # Colored zone
@@ -45,7 +47,7 @@ class Delegate(QStyledItemDelegate):
             color = (*Colors.zoneColors[index.column()], 80)
 
         # Gray even block
-        elif (index.row() // self.window.numStatParam) % 2 == 1:
+        elif (index.row() // numStatParam) % 2 == 1:
                 color = (200, 200, 200, 120)
 
         try:
