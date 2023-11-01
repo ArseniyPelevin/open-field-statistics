@@ -1,37 +1,83 @@
+import sys
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import Qt
+import pandas as pd
+import numpy as np
 import inspect
 import os
 import csv
 
 from PyQt6.QtWidgets import (QFileDialog,
-    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
+    QTableView, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QStyleFactory
     )
 from PyQt6.QtCore import (
-    Qt, QSize, QEvent, QPointF
+    Qt, QSize, QEvent, QPointF, QAbstractTableModel
     )
 
 from superqt import QRangeSlider
 
-from ColorStyle import Delegate
+# from ColorStyle import Delegate #!!!
 
 
-class TableWidget(QTableWidget):
-    def __init__(self, window, app, rows, columns):
+class TableModel(QtCore.QAbstractTableModel):
+
+    def __init__(self, data):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        super().__init__(rows, columns)
+        super(TableModel, self).__init__()
+
+        self._data = data
+
+    def data(self, index, role):
+        # print(__name__, inspect.currentframe().f_code.co_name)
+
+        if role == Qt.DisplayRole:
+            value = self._data.iloc[index.row(), index.column()]
+            return str(np.round(value, 1))
+
+    def rowCount(self, index):
+        # print(__name__, inspect.currentframe().f_code.co_name)
+
+        return self._data.shape[0]
+
+    def columnCount(self, index):
+        # print(__name__, inspect.currentframe().f_code.co_name)
+
+        return self._data.shape[1]
+
+    def headerData(self, section, orientation, role):
+        # print(__name__, inspect.currentframe().f_code.co_name)
+
+        # Section is the index of the column/row.
+        if role == Qt.DisplayRole:
+            if orientation == Qt.Horizontal:
+                return str(self._data.columns[section])
+
+            if orientation == Qt.Vertical:
+                return f'{self._data.index[section][0]}, {self._data.index[section][1]}'
+
+    def updateData(self, data):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
+        self.layoutAboutToBeChanged.emit()
+        self._data = data
+        self.layoutChanged.emit()
+
+
+class TableView(QTableView):
+    def __init__(self, window, app):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
+        super().__init__()
+
         self.window = window
         self.app = app
-        self.time = self.window.time
-        self.map = self.window.map
+        self.data = self.window.stat.data
 
-        self.time.table = self
-        self.map.table = self
+        self.model = TableModel(self.data)
+        self.setModel(self.model)
 
-        self.numStatParam = rows
-        self.statParam = self.window.statParam
-        self.verticalHeaders = ['Time (s)', 'Distance (cm)', 'Velocity (cm/s)',
-                                'Rearings number', 'Rearings time (s)']
         self.setTable()
 
     def setTable(self):
@@ -45,15 +91,13 @@ class TableWidget(QTableWidget):
         self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
-        # Let Delegate control table coloring
-        self.setItemDelegate(Delegate(self, self.window))
+
 
         # Set table headers
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        headersTotal = [f'Total time, {x}' for x in self.verticalHeaders]
-        self.setVerticalHeaderLabels(headersTotal)
-        self.setHorizontalHeaderLabels(['Whole field'])
 
+        # # Let Delegate control table coloring
+        # self.setItemDelegate(Delegate(self, self.window)) #!!!
         self.setStyleSheet('''
                                 QTableView {
                                     gridline-color: black;
@@ -82,7 +126,7 @@ class TableWidget(QTableWidget):
                                     border: 1px solid black;
                                 }''')
 
-        # self.show()
+        self.show()
         self.setFixedWidth(self.tableWidth())
         self.adjustSize()
 
@@ -90,11 +134,11 @@ class TableWidget(QTableWidget):
     def tableWidth(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        # self.app.processEvents()
-        # self.app.processEvents()
+        self.app.processEvents()
+        self.app.processEvents()
         tableWidth = self.verticalHeader().width() + \
-                     self.horizontalHeader().length() + \
-                     self.frameWidth() * 2
+                      self.horizontalHeader().length() + \
+                      self.frameWidth() * 2
         if self.verticalScrollBar().isVisible():
             tableWidth += self.verticalScrollBar().width()
 
@@ -115,92 +159,17 @@ class TableWidget(QTableWidget):
         # Adjust table width to contents
         self.setFixedWidth(self.tableWidth())
         # Adjust window width to table
-        self.app.processEvents()
+        self.app.processEvents() #???
         self.window.adjustSize()
 
         try:
-            self.tableData = self.window.stat.table(self.map.zoneCoord, self.time.startSelected,
-                                        self.time.endSelected, self.time.period,
-                                        self.statParam)
+            timeParams = (self.window.params['startSelected'],
+                          self.window.params['endSelected'],
+                          self.window.params['period'])
+            data = self.window.stat.get_data(timeParams)
+            self.window.table.model.updateData(data)
         except AttributeError:  # If .csv has not yet been opened
             return
 
-        s = self.time.hasSelectedStat
-        n = self.numStatParam
-
-        # Fill Total time statistics
-        for zone in range(self.map.numZones+1):
-            for k in range(n):
-                key = self.statParam[k]
-                val = round(self.tableData[0][zone][key], 1)
-                item = QTableWidgetItem(str(val))
-                self.setItem(k, zone, item)
-
-        # Fill Selected time statistics
-        if self.time.hasSelectedStat:
-            for zone in range(self.map.numZones+1):
-                for k in range(n):
-                    key = self.statParam[k]
-                    val = round(self.tableData[-1][zone][key], 1)
-                    item = QTableWidgetItem(str(val))
-                    self.setItem(n+k, zone, item)
-
-        # Fill Periods statistics
-        if self.time.numPeriods != 0:
-            for per in range(1, self.time.numPeriods+1):
-                for zone in range(self.map.numZones+1):
-                    for k in range(n):
-                        key = self.statParam[k]
-                        val = round(self.tableData[per][zone][key], 1)
-                        item = QTableWidgetItem(str(val))
-                        self.setItem(n*(per+s) + k, zone, item)
-
-
     def saveData(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
-
-        ''' Save table with statistics to a new .csv file '''
-
-        self.outputFile, _filter = QFileDialog.getSaveFileName(self.window, 'Save statistics',
-                          os.path.splitext(self.window.inputFileName)[0]+'_statistics.csv')
-
-        with open(self.outputFile, 'w+', newline='') as output:
-            writer = csv.writer(output, delimiter=';')
-
-            # Set CSV delimiter
-            writer.writerow(['sep=;'])
-
-            n = self.numStatParam
-
-            # Write horizontal header
-            writer.writerow(['', '', 'Whole field']
-                            + [f'Zone {x+1}' for x in range(self.map.numZones)])
-
-            # Write Total time statistics
-            for k in range(n):
-                key = self.statParam[k]
-                writer.writerow(['Total time', f'{self.verticalHeaders[k]}']
-                                + [round(self.tableData[0][zone][key], 1)
-                                 for zone in range(self.map.numZones+1)])
-
-            # Write Selected time statistics
-            if self.time.hasSelectedStat:
-                for k in range(n):
-                        key = self.statParam[k]
-                        writer.writerow([
-                    f'Selected time {self.time.startSelected}-{self.time.endSelected} s',
-                    f'{self.verticalHeaders[k]}']
-                    + [round(self.tableData[-1][zone][key], 1)
-                       for zone in range(self.map.numZones+1)])
-
-            # Write Periods statistics
-            if self.time.numPeriods != 0:
-                for per in range(self.time.numPeriods):
-                    for k in range(n):
-                        key = self.statParam[k]
-                        start = self.time.periodTimes[per][0]
-                        end = self.time.periodTimes[per][1]
-                        writer.writerow([f'{start}-{end} s',
-                                         f'{self.verticalHeaders[k]}']
-                                        + [round(self.tableData[per+1][zone][key], 1)
-                                           for zone in range(self.map.numZones+1)])
+        pass
