@@ -15,8 +15,7 @@ from PyQt6.QtGui import QFontMetrics, QIcon, QAction
 
 from superqt import QRangeSlider
 
-# from DataProcessing import DataProcessing
-from DataProcessing_pandas import DataProcessing_pandas #!!!
+from DataProcessing import DataProcessing
 
 from Map import MapWidget
 from Time import TimePeriodSettings
