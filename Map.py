@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QRubberBand
 )
 from PyQt6.QtCore import (
-    Qt, pyqtSlot, QPoint, QPointF, QRect, QLineF
+    Qt, pyqtSlot, QPoint, QPointF, QRect, QLineF, QSignalBlocker
     )
 from PyQt6.QtGui import (
     QIcon, QPixmap, QImage, QPainter, QPen, QColor, QPolygonF
@@ -26,11 +26,10 @@ class MapWidget(QLabel):
         super().__init__()
 
         self.window = window
-        self.table = None
+        # self.table = None
 
-        # self.numLasers = self.window.params['numLasers']
-        self.numLasersX = 16
-        self.numLasersY = 16
+        self.numLasersX = self.window.params['numLasersX']
+        self.numLasersY = self.window.params['numLasersY']
 
         # self.mapSideY = self.window.params['mapSideY']#!!!
         self.mapSideY = 320 #???
@@ -51,7 +50,10 @@ class MapWidget(QLabel):
         # Rubber band for drag-selection
         self.rubberBand = QRubberBand(QRubberBand.Shape.Rectangle, self)
 
-        self.zoneCoord = np.zeros((self.numLasersY, self.numLasersX), dtype=int)
+        if 'zoneCoord' in self.window.params:
+            self.zoneCoord = np.array(self.window.params['zoneCoord'])
+        else:
+            self.zoneCoord = np.zeros((self.numLasersY, self.numLasersX), dtype=int)
 
         self.pathPoints = []  # Will be assigned from __main__ after loading raw data
         self.numZones = 0
@@ -146,7 +148,7 @@ class MapWidget(QLabel):
         pathPainter.setPen(QPen(Qt.red, 2))
         # pathPainter.drawPolyline(self.pathPoints[iStart:iEnd])
         # pathPainter.drawPolyline(self.makePath[iStart:iEnd])
-        pathPainter.drawPolyline(self.makePath(self.stat.df[start:end]))
+        pathPainter.drawPolyline(self.makePath(self.window.stat.df[start:end]))
 
         pathPainter.end()
 
@@ -220,10 +222,10 @@ class MapWidget(QLabel):
             self.numZones += 1
 
             # Add new table column
-            header = QTableWidgetItem(f'Zone {self.numZones}')
-            num = self.table.columnCount()
-            self.table.setColumnCount(num + 1)
-            self.table.setHorizontalHeaderItem(num, header)
+            # header = QTableWidgetItem(f'Zone {self.numZones}')
+            # num = self.table.columnCount()
+            # self.table.setColumnCount(num + 1)
+            # self.table.setHorizontalHeaderItem(num, header)
 
         # Uncheck all map buttons, update table
         self.updateZoneNumber()
@@ -248,16 +250,11 @@ class MapWidget(QLabel):
             for j in range(layout.count()):
                 button = layout.itemAt(j).widget()
                 # Uncheck 'em quietly
-                button.blockSignals(True)
-                button.setChecked(False)
-                button.blockSignals(False)
+                with QSignalBlocker(button):
+                    button.setChecked(False)
 
-        # self.table.fillTable() #!!!
-        timeParams = (self.time.start, self.time.end, self.time.period)
-        self.stat.get_data(timeParams)
-        self.table.model.layoutChanged.emit()
-        self.adjustSize()
-        self.setStyleSheet(Colors.styleSheet(self.numZones))
+        self.window.table.fillTable()
+        # self.setStyleSheet(Colors.styleSheet(self.numZones)) #???
 
     def fillPredefinedZones(self, newBtn):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -293,7 +290,7 @@ class MapWidget(QLabel):
 
         self.updateMapZones()
         self.numZones = 0
-        self.table.setColumnCount(1)
+        # self.table.setColumnCount(1)
         self.addNewZone(numNewZones = numNewZones)
 
     def mapBtnToggled(self, checked, x=-1, y=-1, s=-1):
@@ -508,7 +505,7 @@ class MapWidget(QLabel):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.numZones = 0
-        self.table.setColumnCount(1)
+        # self.table.setColumnCount(1)
 
         # Deselect all map areas
         self.zoneCoord[:, :] = 0
@@ -547,7 +544,7 @@ class MapWidget(QLabel):
 
         for idx, name in self.areaBtnIdx.items():
             # Create custom area map buttons with separate methods,
-            # and them to self.mapLayout - a QStackedLayout
+            # and add them to self.mapLayout - a QStackedLayout
             if name in self.customAreas:
                 areaMap = customAreaMethods[idx]()
                 self.mapLayout.insertWidget(idx, areaMap)
