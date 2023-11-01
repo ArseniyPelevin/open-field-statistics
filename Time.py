@@ -8,10 +8,12 @@ from PyQt6.QtWidgets import (
     QLabel, QLineEdit, QPushButton, QButtonGroup, QSpacerItem,
     QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStyleFactory
+    QStyleFactory,
+    QDoubleSpinBox
 )
 from PyQt6.QtCore import (
-    Qt, QSize, pyqtSlot, QEvent, QPointF, QVariantAnimation, QRegularExpression
+    Qt, QSize, pyqtSlot, QEvent, QPointF, QVariantAnimation, QRegularExpression,
+    QSignalBlocker
     )
 from PyQt6.QtGui import (
     QFontMetrics, QIcon,
@@ -28,11 +30,10 @@ class TimePeriodSettings:
 
         self.window = window
         self.map = self.window.map
-        self.table = None
 
-
-        self.numStatParam = len(self.window.params['statParams'])
-        self.hasSelectedStat = False
+        self.params = self.window.params
+        # self.numStatParam = len(self.params['statParams'])
+        # self.hasSelectedStat = False
 
         self.setTimeWidgets()
         self.setTimeSignals()
@@ -41,110 +42,126 @@ class TimePeriodSettings:
     def setTimeWidgets(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        self.startTime = QLineEdit(alignment = Qt.AlignLeft)
-        self.startTime.setFixedWidth(60)
-        self.startTime.setDisabled(True)
-        self.endTime = QLineEdit(alignment = Qt.AlignRight)
-        self.endTime.setFixedWidth(60)
-        self.endTime.setDisabled(True)
-        self.selectedTimeLabel = QLabel()
+        self.periodLabel = QLabel('Time period every ')
+
+        self.periodLine = QDoubleSpinBox(alignment = Qt.AlignRight)
+        self.periodLine.setFixedWidth(60)
+        self.periodLine.setDecimals(1)
+        self.periodLine.setSuffix(' s')
+        self.periodLine.setDisabled(True)
+
+        self.startSelectedLine = QDoubleSpinBox(alignment = Qt.AlignLeft)
+        self.startSelectedLine.setFixedWidth(60)
+        self.startSelectedLine.setDecimals(1)
+        self.startSelectedLine.setSuffix(' s')
+        self.startSelectedLine.setDisabled(True)
+
+        self.endSelectedLine = QDoubleSpinBox(alignment = Qt.AlignRight)
+        self.endSelectedLine.setFixedWidth(60)
+        self.endSelectedLine.setDecimals(1)
+        self.endSelectedLine.setSuffix(' s')
+        self.endSelectedLine.setDisabled(True)
+
         self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
         self.timeRangeSlider.setDisabled(True)
 
-        self.timePeriod = QLabel('Time period every ')
-        self.periodLine = QLineEdit(alignment = Qt.AlignRight)
-        self.periodLine.setFixedWidth(60)
-        self.periodLine.setDisabled(True)
+        self.selectedTimeLabel = QLabel()
+
         # Default LineEdit background will be needed for error warning
         self.defaultLineEditBackground = self.periodLine.palette().color(
                                          QPalette.Active, QPalette.Base)
-        self.secondsLabel = QLabel(' seconds')
-
-        # Set input validator
-        rx = QRegularExpression(r'^\d*\.?\d?$')  # float
-        inputValidator = QRegularExpressionValidator(rx)
-        self.periodLine.setValidator(inputValidator)
-        self.startTime.setValidator(inputValidator)
-        self.endTime.setValidator(inputValidator)
 
     def setTimeSignals(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         # Update period
-        self.periodLine.editingFinished.connect(self.checkPeriodValue)
+        self.periodLine.valueChanged.connect(self.checkPeriod)
 
         # Update time range from text
-        self.startTime.editingFinished.connect(self.checkStartTimeValue)
-        self.endTime.editingFinished.connect(self.checkEndTimeValue)
+        self.startSelectedLine.valueChanged.connect(self.checkStartSelected)
+        self.endSelectedLine.valueChanged.connect(self.checkEndSelected)
 
         # Update time range from slider
-        self.timeRangeSlider.sliderMoved.connect(self.sliderUpdateTimeRange)
-        self.timeRangeSlider.sliderReleased.connect(self.selectedStatistics)
+        self.timeRangeSlider.sliderMoved.connect(self.sliderUpdateSelectedTime)
+        self.timeRangeSlider.sliderReleased.connect(self.updateSelectedTime)
 
     def setTimeLayouts(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.timeRangeLayout = QGridLayout()
-        self.timeRangeLayout.addWidget(self.startTime, 0, 0, Qt.AlignLeft)
+        self.timeRangeLayout.addWidget(self.startSelectedLine, 0, 0, Qt.AlignLeft)
         self.timeRangeLayout.addWidget(self.selectedTimeLabel, 0, 1, Qt.AlignCenter)
-        self.timeRangeLayout.addWidget(self.endTime, 0, 2, Qt.AlignRight)
+        self.timeRangeLayout.addWidget(self.endSelectedLine, 0, 2, Qt.AlignRight)
         self.timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 3, Qt.AlignBottom)
 
         self.periodLayout = QHBoxLayout()
-        self.periodLayout.addWidget(self.timePeriod, alignment = Qt.AlignRight)
+        self.periodLayout.addWidget(self.periodLabel, alignment = Qt.AlignRight)
         self.periodLayout.addWidget(self.periodLine, alignment = Qt.AlignRight)
-        self.periodLayout.addWidget(self.secondsLabel, alignment = Qt.AlignRight)
+        # self.periodLayout.addWidget(self.secondsLabel, alignment = Qt.AlignRight)
 
-    def updateTimeVariables(self, stat):
+    def loadTimeVariables(self, stat):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        ''' Set time variables based on loaded raw data '''
+        ''' Update time variables based on loaded raw data '''
 
         self.stat = stat
         self.data = self.stat.data
-        # Update variables
-        self.startSelected = 0
+        print(self.data)
         self.totalTime = self.data.loc[("Total_time", "time"), "Whole_field"]
-        self.endSelected = self.totalTime
-        self.selectedTime = self.endSelected
-        self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
-        self.period = self.totalTime
-        self.numPeriods = 0
 
-        self.setTimeRange()
+        if 'startSelected' not in self.params:
+            self.params['startSelected'] = 0
+        if 'endSelected' not in self.params:
+            self.params['endSelected'] = self.totalTime
+        if 'period' not in self.params:
+            self.params['period'] = self.totalTime
+
+        self.selectedTime = round(self.params['endSelected']
+                                  - self.params['startSelected'], 1)
+
+        self.loadTimeWidgets()
         # self.table = self.window.table
 
-    def setTimeRange(self):
+    def loadTimeWidgets(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        ''' Set selected time range based on loaded raw data '''
+        ''' Update time widgets based on loaded raw data '''
+
+        self.startSelectedLine.setRange(0., self.totalTime)
+        self.endSelectedLine.setRange(0., self.totalTime)
+        self.periodLine.setRange(1., self.totalTime)
+
+        self.startSelectedLine.setValue(self.params['startSelected'])
+        self.endSelectedLine.setValue(self.params['endSelected'])
+        if self.params['period'] < self.selectedTime:
+            self.periodLine.setValue(self.params['period'])
+
+        self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
 
         sliderStep = 0.1   # Step of selected time range slider in seconds
         self.timeRangeSlider.setRange(0, self.totalTime / sliderStep)
-        self.timeRangeSlider.setValue([0, self.totalTime / sliderStep])
+        self.timeRangeSlider.setValue([self.params['startSelected'],
+                                       self.params['endSelected'] / sliderStep])
 
-        self.startTime.setEnabled(True)
-        self.endTime.setEnabled(True)
-        self.timeRangeSlider.setEnabled(True)
+        self.startSelectedLine.setEnabled(True)
+        self.endSelectedLine.setEnabled(True)
         self.periodLine.setEnabled(True)
+        self.timeRangeSlider.setEnabled(True)
 
-        self.startTime.setText(str(0))
-        self.endTime.setText(str(self.totalTime))
-
+#%%
 #??? Delete this method alltogether?
-    def selectedStatistics(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+    # def updateSelectedTime(self):
+    #     print(__name__, inspect.currentframe().f_code.co_name)
 
-        '''
-        User can selected a time range within recording time to analyze.
-        All statistics will be shown for this range,
-        except for Total time statistics
-        '''
+    #     '''
+    #     User can selected a time range within recording time to analyze.
+    #     All statistics will be shown for this range,
+    #     except for Total time statistics
+    #     '''
 
         # n = self.numStatParam
 
-        start = float(self.startTime.text())
-        end = float(self.endTime.text())
+
 
 #!!!
         # iStart = self.stat.timeIndex(start)
@@ -164,88 +181,86 @@ class TimePeriodSettings:
         #         self.table.setVerticalHeaderItem(n + i, headersSelected[i])
         #     self.hasSelectedStat = True
 
-        self.startSelected = start
-        self.endSelected = end
-        self.selectedTime = round(self.endSelected - self.startSelected, 1)
-        self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
-        self.updatePeriod()
+        # self.params['startSelected'] = start
+        # self.params['endSelected'] = end
+        # self.selectedTime = round(end - start, 1)
+        # self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
+
+        # self.updatePeriod()
 
         # self.map.updateMapPath(iStart, iEnd)
-        self.map.updateMapPath(start, end) #??? Passing df here?
+        # self.map.updateMapPath(start, end) #??? Passing df here?
+        #%%
 
-    def updatePeriod(self, period=0, isUsersPeriod=False):
+    def checkPeriod(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        '''
-        Selected time is split to periods of user-defined length in seconds.
-        Statistics for each period (and in each zone) is shown in the table.
+#??? Don't need try now
+        try:
+            period = self.periodLine.value()
+        # Empty line was entered
+        except ValueError:
+            period = 0
+        else:
+            if period > self.selectedTime:
+                errorMessage = ('Period should be in the range:\n'
+                                + f'1 s < period < {self.selectedTime} s')
+                self.errorWarning(self.periodLine, errorMessage)
+                period = self.selectedTime
 
-        isUserPeriod == True: user defined the period itself
-        isUserPeriod == False: the period is defined by Total or Selected time
-        '''
+        self.updatePeriod(period)
 
-        # Period statistics goes after Total time and Selected time in table
-        # n = self.numStatParam
-        # self.table.setRowCount(n + n * self.hasSelectedStat)
-
-        # Period is not defined
-        if period == 0 or period == self.selectedTime or not isUsersPeriod:
-            self.period = self.selectedTime  # Default value
-            self.periodLine.setText('')
-            # self.numPeriods = 0
-            # self.periodTimes = []
-            # self.table.fillTable() #!!!
-            # self.table.model.layoutChanged.emit()
-            # return
-
-        # self.period = period
-        # self.numPeriods = m.ceil(self.selectedTime / self.period)
-        # self.periodTimes = []   # Start and end of each period
-        #                         # ! relative to Selected time !
-        # for i in range(self.numPeriods):
-        #     timeStart = round(i * self.period, 1)
-        #     timeEnd = round((i+1) * self.period, 1)
-        #     if timeEnd > self.selectedTime:
-        #         timeEnd = self.selectedTime
-        #     self.periodTimes.append((timeStart, timeEnd))
-        #     numRows = self.table.rowCount()
-        #     self.table.setRowCount(numRows+n)
-        #     # For each period add empty rows for its statistics in table
-        #     for j in range(n):
-        #         self.table.setVerticalHeaderItem(numRows + j,
-        #             QTableWidgetItem(f'{timeStart}-{timeEnd} s, '
-        #                              + f'{self.table.verticalHeaders[j]}'))
-
-        # self.table.fillTable() #!!!
-
-        timeParams = (self.start, self.end, period)
-        self.stat.get_data(timeParams)
-        self.table.model.layoutChanged.emit()
-
-    def sliderUpdateTimeRange(self, value):
+    def checkStartSelected(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        ''' Update path while Selected time slider is being moved '''
+#???
+        try:
+            start = self.startSelectedLine.value()
+        # Empty line was entered as start time, set start to 0
+        except ValueError:
+            start = 0
+            self.startSelectedLine.setValue(start)
+        else:
+            # Selected start > Selected end, back to initial value
+            if start >= self.params['endSelected']:
+                errorMessage = ('Start time should be in the range:\n'
+                                + f"0 s <= start time < {self.params['endSelected']} s")
+                self.errorWarning(self.startSelectedLine, errorMessage)
 
-        start, end = [x/10 for x in value] #self.timeRangeSlider.value()]
+                start = self.params['startSelected']
+                self.startSelectedLine.setValue(start)
 
-        # Update values in text editors based on slider
-        self.startTime.setText(str(start))
-        self.endTime.setText(str(end))
+        self.updateSelectedTime(start, self.params['endSelected'])
 
-#!!!
-        # iStart = self.stat.timeIndex(start)
-        # iEnd = self.stat.timeIndex(end)
-
-        # self.map.updateMapPath(iStart, iEnd)
-        self.map.updateMapPath(start, end) #??? Passing df here?
-
-    def textUpdateTimeRange(self, start, end):
+    def checkEndSelected(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        # Update slider values based on text editors
-        self.timeRangeSlider.setValue([start*10, end*10])
-        self.selectedStatistics()
+#???
+        try:
+            end = self.endSelectedLine.value()
+        # Empty line was entered as end time, set end to max total time
+        except ValueError:
+            end = self.totalTime
+            self.endSelectedLine.setValue(end)
+        else:
+            errorMessage = ('End time should be in the range:\n'
+                            + f"{self.params['startSelected']} s < end time <= {self.totalTime} s")
+
+            # Selected end < Selected start, back to previous value
+            if end <= self.params['startSelected']:
+                self.errorWarning(self.endSelectedLine, errorMessage)
+
+                end = self.params['endSelected']
+                self.endSelectedLine.setValue(end)
+
+            # Selected end > total time, set Selected time to max total time
+            elif end > self.totalTime:
+                self.errorWarning(self.endSelectedLine, errorMessage)
+
+                end = self.totalTime
+                self.endSelectedLine.setValue(end)
+
+        self.updateSelectedTime(self.params['startSelected'], end)
 
     def errorWarning(self, widget, errorMessage=''):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -281,69 +296,84 @@ class TimePeriodSettings:
         # Show a tooltip explaining the error
         QToolTip.showText(self.window.mapToGlobal(widget.pos()), errorMessage, widget)
 
-    def checkPeriodValue(self):
+    def sliderUpdateSelectedTime(self, value):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        try:
-            period = float(self.periodLine.text())
-        # Empty line was entered
-        except ValueError:
-            period = 0
-        else:
-            if period > self.selectedTime:
-                errorMessage = ('Period should be in the range:\n'
-                                + f'0 < period < {self.selectedTime}')
-                self.errorWarning(self.periodLine, errorMessage)
-                period = self.selectedTime
+        ''' Update path while Selected time slider is being moved '''
 
-        self.updatePeriod(period, isUsersPeriod=True)
+        start, end = [x/10 for x in value] #self.timeRangeSlider.value()]
 
-    def checkStartTimeValue(self):
+        # Update values in text editors based on slider. Block their signals
+        with QSignalBlocker(self.startSelectedLine):
+            self.startSelectedLine.setValue(start)
+        with QSignalBlocker(self.endSelectedLine):
+            self.endSelectedLine.setValue(end)
+
+        self.map.updateMapPath(start, end)
+        # Do not update SelectedTime values here while slider is being moved
+
+    def updateSelectedTime(self, start=None, end=None):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        try:
-            start = float(self.startTime.text())
-        # Empty line was entered as start time, set start to 0
-        except ValueError:
-            start = 0
-            self.startTime.setText(str(start))
-        else:
-            # Selected start > Selected end, back to initial value
-            if start >= self.endSelected:
-                errorMessage = ('Start time should be in the range:\n'
-                                + f'0 <= start time < {self.endSelected}')
-                self.errorWarning(self.startTime, errorMessage)
+        if start is None or end is None:
+            start, end = self.timeRangeSlider.sliderPosition()
+            start /= 10
+            end /= 10
 
-                start = self.startSelected
-                self.startTime.setText(str(start))
+        self.params['startSelected'] = start
+        self.params['endSelected'] = end
 
-        self.textUpdateTimeRange(start, self.endSelected)
+        # Update slider values based on text editors
+        self.timeRangeSlider.setValue([start*10, end*10])
 
-    def checkEndTimeValue(self):
+        self.selectedTime = round(end - start, 1)
+        self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
+
+        self.updatePeriod()
+
+    def updatePeriod(self, period=0):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        try:
-            end = float(self.endTime.text())
-        # Empty line was entered as end time, set end to max total time
-        except ValueError:
-            end = self.totalTime
-            self.endTime.setText(str(end))
-        else:
-            errorMessage = ('End time should be in the range:\n'
-                            + f'{self.startSelected} < end time <= {self.totalTime}')
+        '''
+        Selected time is split to periods of user-defined length in seconds.
+        Statistics for each period (and in each zone) is shown in the table.
+        '''
 
-            # Selected end < Selected start, back to previous value
-            if end <= self.startSelected:
-                self.errorWarning(self.endTime, errorMessage)
+        # Period statistics goes after Total time and Selected time in table
+        # n = self.numStatParam
+        # self.table.setRowCount(n + n * self.hasSelectedStat)
 
-                end = self.endSelected
-                self.endTime.setText(str(end))
+        self.params['period'] = period
+        self.periodLine.lineEdit().setVisible(True)
 
-            # Selected end > total time, set Selected time to max total time
-            elif end > self.totalTime:
-                self.errorWarning(self.endTime, errorMessage)
+        # Period is not defined
+        if period == 0 or period == self.selectedTime:
+            self.params['period'] = self.selectedTime  # Default value
+            self.periodLine.setValue(0)
+            # self.periodLine.lineEdit().setVisible(False)
+            self.periodLine.setSpecialValueText(' s')
+            # self.numPeriods = 0
+            # self.periodTimes = []
+            # self.table.fillTable() #!!!
+            # self.table.model.layoutChanged.emit()
+            # return
 
-                end = self.totalTime
-                self.endTime.setText(str(end))
+        # self.period = period
+        # self.numPeriods = m.ceil(self.selectedTime / self.period)
+        # self.periodTimes = []   # Start and end of each period
+        #                         # ! relative to Selected time !
+        # for i in range(self.numPeriods):
+        #     timeStart = round(i * self.period, 1)
+        #     timeEnd = round((i+1) * self.period, 1)
+        #     if timeEnd > self.selectedTime:
+        #         timeEnd = self.selectedTime
+        #     self.periodTimes.append((timeStart, timeEnd))
+        #     numRows = self.table.rowCount()
+        #     self.table.setRowCount(numRows+n)
+        #     # For each period add empty rows for its statistics in table
+        #     for j in range(n):
+        #         self.table.setVerticalHeaderItem(numRows + j,
+        #             QTableWidgetItem(f'{timeStart}-{timeEnd} s, '
+        #                              + f'{self.table.verticalHeaders[j]}'))
 
-        self.textUpdateTimeRange(self.startSelected, end)
+        self.window.table.fillTable()
