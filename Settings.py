@@ -44,13 +44,13 @@ class Settings(QDialog):
         super().__init__(window)
 
         self.window = window
-        self.loadParameters()
+        self.loadSettings()
 
 
 #TODO QTabBar ?
 #https://doc.qt.io/qt-5/qtabwidget.html
 
-    def loadParameters(self):
+    def loadSettings(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         if 'RecentParameters.json' in os.listdir():

@@ -3,14 +3,28 @@ import numpy as np
 import inspect
 
 
-class DataProcessing_pandas():
+class DataProcessing():
     def __init__(self, params, zoneCoord):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.params = params
         self.zoneCoord = zoneCoord
 
-        # self.read()  # !!! temp
+        self.has_file = False
+        self.dummy_data = self.make_dummy_data()
+
+    def make_dummy_data(self):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
+        return pd.DataFrame(
+            data=np.full(shape=(len(self.params['statParams']),
+                                self.zoneCoord.max() + 1),
+                         fill_value=''),
+            index=pd.MultiIndex.from_product([['Total_time'],
+                                              self.params['statParams']]),
+            columns=(['Whole_field']
+                     + [f'Zone {i}' for i in range(1, self.zoneCoord.max() + 1)])
+        )
 
     def read(self, file):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -27,7 +41,18 @@ class DataProcessing_pandas():
                          )
                    .pipe(self.process_raw_data)
                    )
-        self.data = self.get_data(self.df)
+
+        self.has_file = True
+
+        # Check that loaded data fit current numLasers parameters
+        max_x = self.df[['x1', 'x2']].max(axis=None)
+        max_y = self.df[['y1', 'y2']].max(axis=None)
+        if max_x <= self.params['numLasersX']:
+            max_x = 0
+        if max_y <= self.params['numLasersX']:
+            max_y = 0
+
+        return int(max_x), int(max_y)
 
 # %%
 
@@ -37,8 +62,6 @@ class DataProcessing_pandas():
         # Exclude rows with any of four coordinates missing
 #TODO Let user define this behavior in Settings (Start of recording/First beam break)
         df = df.loc[(df.loc[:, 'x1':'y2'] != 0).all(axis=1)]
-
-
 
         # Absolute timestamps to timedeltas since start
         df.index -= df.index[0]
@@ -85,6 +108,7 @@ class DataProcessing_pandas():
 
     def pivot_zone_wise(self, df, index):
         print(__name__, inspect.currentframe().f_code.co_name)
+
         df = (df
               .rename(columns={'x': 'time', 'dz': 'z_num', 'z': 'z_time'})
               .pivot_table(
@@ -95,26 +119,28 @@ class DataProcessing_pandas():
                            'z_num': 'sum', 'z_time': 'sum'}
               )
               )
+
+        # Account for occasional one 0.1 s line leftover
+        # if df.loc[df.index[-1], 'time'] == 1:
+        #     df = df.drop(index=df.index[-1])
         return df
 
     # %%
 
-    def get_data(self, df, time_params=None):
+    def get_data(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        if time_params:
-            start, end, period = time_params
-            # grouper = pd.Grouper(level='time',
-            #                      freq=period,
-            #                      origin='start',
-            #                      closed='left'
-            #                      )
-        else:
-            start = 0
-            end = df.index[-1].total_seconds()
-            # Add 0.1 s to include the whole time range in the default period
-            period = end + 0.1
-            # grouper = None
+        # Without loaded file return an empty table
+        if not self.has_file:
+            return self.make_dummy_data()
+
+        start = self.params['startSelected']
+        end = self.params['endSelected']
+        period = self.params['period']
+
+        if period == end:
+            period += 0.1
+
 
         # To access from other modules
         # self.start, self.end, self.period = start, end, period #???
@@ -140,7 +166,8 @@ class DataProcessing_pandas():
         zones = [*range(1, self.zoneCoord.max() + 1)]
 
         # Define zone of each timestamp
-        df['zone'] = self.zoneCoord[df['y'].astype(int), df['x'].astype(int)]
+        self.df['zone'] = self.zoneCoord[self.df['y'].astype(int),
+                                         self.df['x'].astype(int)]
 
         grouper = pd.Grouper(level='time',
                              freq=period,
@@ -149,14 +176,21 @@ class DataProcessing_pandas():
                              )
 
         # Aggregate data for each period/zone (within Selected_time)
-        data = (df
+        data = (self.df
                 .loc[start:end]
                 .pipe(self.pivot_zone_wise, grouper)
-                .set_axis(periods_index, axis='index')
                 )
+        print('\n!!!')
+        print(data)
+        print(periods_index)
+        print('???\n')
+        data = data.set_axis(periods_index, axis='index')
+
+
         # Aggregate data outside of selected_time
         data.loc['_not_selected'] = (pd
-                                     .concat([df.loc[:start-'0.1s'], df.loc[end+'0.1s':]])
+                                     .concat([self.df.loc[:start-'0.1s'],
+                                              self.df.loc[end+'0.1s':]])
                                      .pipe(self.pivot_zone_wise, None)
                                      .unstack().swaplevel()
                                      )
@@ -197,42 +231,18 @@ class DataProcessing_pandas():
                              ['time', 'dist', 'vel', 'z_num', 'z_time']])
                          )
                 # .rename(index={'time': 'Time (s)',
-                #                'dist': 'Distance (cm)',
-                #                'vel': 'Velocity (cm/s)',
-                #                'z_num': 'Rearings number',
-                #                'z_time': 'Rearings time (s)'},
-                        # level=1)
+                #                 'dist': 'Distance (cm)',
+                #                 'vel': 'Velocity (cm/s)',
+                #                 'z_num': 'Rearings number',
+                #                 'z_time': 'Rearings time (s)'},
+                #         level=1)
                 )
 
         #???
-        print(f'Test total time:\nEnd-start: {df.index[-1].total_seconds()}\n' +
-              f'Total_time/Whole_field: {data.loc[("Total_time", "time"), "Whole_field"]}')
+        # print(f'Test total time:\n\tEnd-start: {self.df.index[-1].total_seconds()}\n' +
+        #       f'\nTotal_time/Whole_field: {data.loc[("Total_time", "time"), "Whole_field"]}')
 
         return data
-
-
-# %%
-def temp_args():
-    params = {'numLasersX': 16,
-              'numLasersY': 16,
-              'boxSideX': 40,      # Physical dimensions of the filed, cm
-              'boxSideY': 40,
-              'mapSideY': 320,     # px, mapSideX is calculated
-              # from box sides ratio
-              'numStatParam': 5,   # Time, distance, velocity,
-              # rearings number, rearings time
-              # For temporal compatibility. To be deleted later #!!!
-              'numLasers': 16,
-              'boxSide': 40}
-    zoneCoord = np.zeros((16, 16))
-    zoneCoord[:, :] = 3  # Corners
-    wall = 4
-    zoneCoord[wall: -wall, :] = 2  # Walls
-    zoneCoord[:, wall: -wall] = 2
-    zoneCoord[wall: -wall, wall: -wall] = 1  # Center
-    # zoneCoord[:2] = 0
-    zoneCoord = zoneCoord.astype(int)
-    return params, zoneCoord
 
 
 def save(data, file=r'Trials\Test_pandas_output_2.csv'):

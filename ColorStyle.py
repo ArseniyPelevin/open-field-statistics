@@ -4,7 +4,7 @@ from PyQt6.QtGui import QColor, QPalette
 from PyQt6.QtCore import Qt
 
 class Colors():
-    zoneColors = [(255, 255, 255),
+    zoneColors = [(255, 255, 255),  # Zone 0 (not selected)
                   (255, 0, 0), (0, 255, 0), (0, 0, 255),  # Zones 1-3
                    (255, 128, 32), (240, 50, 230), (64, 255, 255),  # Zones 4-6
                    (255, 255, 0), (128, 0, 128), (128, 128, 128),  # Zones 7-9
@@ -54,7 +54,8 @@ class Delegate(QStyledItemDelegate):
             index.model().setData(index, QColor(*color),
                                   Qt.BackgroundColorRole)
             option.palette.setColor(QPalette.Base,
-                                    index.data(Qt.BackgroundColorRole))
+                                    # index.data(Qt.BackgroundColorRole))
+                                    QColor(*color))
         except UnboundLocalError:  # A white cell, no color was set
             pass
 

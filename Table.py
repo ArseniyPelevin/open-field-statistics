@@ -17,7 +17,7 @@ from PyQt6.QtCore import (
 
 from superqt import QRangeSlider
 
-# from ColorStyle import Delegate #!!!
+from ColorStyle import Delegate #!!!
 
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -34,7 +34,7 @@ class TableModel(QtCore.QAbstractTableModel):
 
         if role == Qt.DisplayRole:
             value = self._data.iloc[index.row(), index.column()]
-            return str(np.round(value, 1))
+            return str(value)
 
     def rowCount(self, index):
         # print(__name__, inspect.currentframe().f_code.co_name)
@@ -73,7 +73,7 @@ class TableView(QTableView):
 
         self.window = window
         self.app = app
-        self.data = self.window.stat.data
+        self.data = self.window.stat.dummy_data
 
         self.model = TableModel(self.data)
         self.setModel(self.model)
@@ -97,7 +97,7 @@ class TableView(QTableView):
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         # # Let Delegate control table coloring
-        # self.setItemDelegate(Delegate(self, self.window)) #!!!
+        self.setItemDelegate(Delegate(self, self.window)) #!!!
         self.setStyleSheet('''
                                 QTableView {
                                     gridline-color: black;
@@ -126,7 +126,7 @@ class TableView(QTableView):
                                     border: 1px solid black;
                                 }''')
 
-        self.show()
+        # self.show()
         self.setFixedWidth(self.tableWidth())
         self.adjustSize()
 
@@ -134,8 +134,8 @@ class TableView(QTableView):
     def tableWidth(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        self.app.processEvents()
-        self.app.processEvents()
+        # self.app.processEvents()
+        # self.app.processEvents()
         tableWidth = self.verticalHeader().width() + \
                       self.horizontalHeader().length() + \
                       self.frameWidth() * 2
@@ -152,24 +152,20 @@ class TableView(QTableView):
     #     return tableHeight
 
     def fillTable(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__name__, inspect.currentframe().f_code.co_name, inspect.currentframe().f_back.f_code.co_name)
 
         ''' Fill table with statistics '''
 
+        data = self.window.stat.get_data()
+        self.window.table.model.updateData(data)
+
         # Adjust table width to contents
         self.setFixedWidth(self.tableWidth())
+
         # Adjust window width to table
+        # self.show()
         self.app.processEvents() #???
         self.window.adjustSize()
-
-        try:
-            timeParams = (self.window.params['startSelected'],
-                          self.window.params['endSelected'],
-                          self.window.params['period'])
-            data = self.window.stat.get_data(timeParams)
-            self.window.table.model.updateData(data)
-        except AttributeError:  # If .csv has not yet been opened
-            return
 
     def saveData(self):
         pass

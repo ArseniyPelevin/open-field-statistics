@@ -19,7 +19,6 @@ from DataProcessing import DataProcessing
 
 from Map import MapWidget
 from Time import TimePeriodSettings
-# from Table import TableWidget
 from Table import TableView
 from Settings import Settings
 from Info import Info
@@ -154,13 +153,13 @@ class MainWindow(QMainWindow):
         # .csv files to C:\OpenField by default, thus predefined location
 
         # Read pandas dataframe from file and preprocess it
-        try:
+        if inputFileName:
             maxX, maxY = self.stat.read(inputFileName)
             # Check if data correspond to field settings
             if maxX or maxY:
                 self.incorrectData(maxX, maxY)
                 return
-        except FileNotFoundError:
+        else:  # File dialog exited with Cancel
             return
 
         # Update time variables based on loaded data
@@ -198,6 +197,8 @@ class MainWindow(QMainWindow):
         warningMessage += 'Change beam parameters or load another raw data file.'
 
         QMessageBox.warning(self, 'Incorrect raw data', warningMessage)
+
+        self.stat.has_file = False
 
     def closeEvent(self, event):
         print(__name__, inspect.currentframe().f_code.co_name)

@@ -254,7 +254,7 @@ class MapWidget(QLabel):
                     button.setChecked(False)
 
         self.window.table.fillTable()
-        # self.setStyleSheet(Colors.styleSheet(self.numZones)) #???
+        self.setStyleSheet(Colors.styleSheet(self.numZones)) #???
 
     def fillPredefinedZones(self, newBtn):
         print(__name__, inspect.currentframe().f_code.co_name)
