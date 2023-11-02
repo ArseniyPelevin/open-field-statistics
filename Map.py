@@ -17,7 +17,7 @@ from PyQt6.QtGui import (
 
 import superqt
 
-from ColorStyle import Colors
+from ColorStyle import ColorStyle
 
 class MapWidget(QLabel):
     def __init__(self, window):
@@ -92,7 +92,7 @@ class MapWidget(QLabel):
 
         self.updateMap()
 
-        self.setStyleSheet(Colors.styleSheet(self.numZones))
+        self.setStyleSheet(ColorStyle.mapStyleSheet(self.numZones))
 
     def updateMap(self):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -122,7 +122,7 @@ class MapWidget(QLabel):
         for i in range(self.numLasersY):
             for j in range(self.numLasersX):
                 zone = self.zoneCoord[i][j]
-                zoneColor = QColor(*Colors.zoneColors[zone], int(0.3*255))
+                zoneColor = QColor(*ColorStyle.zoneColors[zone], int(0.3*255))
                 zonePainter.setBrush(zoneColor)
                 x = self.cellX * j
                 y = self.cellY * i
@@ -253,8 +253,9 @@ class MapWidget(QLabel):
                 with QSignalBlocker(button):
                     button.setChecked(False)
 
+
+        self.setStyleSheet(ColorStyle.mapStyleSheet(self.numZones))
         self.window.table.fillTable()
-        self.setStyleSheet(Colors.styleSheet(self.numZones)) #???
 
     def fillPredefinedZones(self, newBtn):
         print(__name__, inspect.currentframe().f_code.co_name)

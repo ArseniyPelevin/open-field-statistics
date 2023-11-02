@@ -14,27 +14,44 @@ from PyQt6.QtWidgets import (QFileDialog,
 from PyQt6.QtCore import (
     Qt, QSize, QEvent, QPointF, QAbstractTableModel
     )
+from PyQt6.QtGui import QColor
 
 from superqt import QRangeSlider
 
-from ColorStyle import Delegate #!!!
+from ColorStyle import ColorStyle
 
 
 class TableModel(QtCore.QAbstractTableModel):
 
-    def __init__(self, data):
+    def __init__(self, data, window):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         super(TableModel, self).__init__()
 
         self._data = data
+        self.window = window
 
     def data(self, index, role):
         # print(__name__, inspect.currentframe().f_code.co_name)
 
+        numStatParam = len(self.window.params['statParams'])
+
         if role == Qt.DisplayRole:
             value = self._data.iloc[index.row(), index.column()]
             return str(value)
+
+        if role == Qt.ItemDataRole.BackgroundRole:
+            color = (255, 255, 255)  # Default white
+            # Overlap of colored zone and gray even block
+            if index.column() != 0 and (index.row() // numStatParam) % 2 == 1:
+                color = ColorStyle.zoneColorsGray[index.column()]
+            # Colored zone
+            elif index.column() != 0:
+                color = (*ColorStyle.zoneColors[index.column()], 80)
+            # Gray even block
+            elif (index.row() // numStatParam) % 2 == 1:
+                color = (200, 200, 200, 120)
+            return QColor(*color)
 
     def rowCount(self, index):
         # print(__name__, inspect.currentframe().f_code.co_name)
@@ -75,7 +92,7 @@ class TableView(QTableView):
         self.app = app
         self.data = self.window.stat.dummy_data
 
-        self.model = TableModel(self.data)
+        self.model = TableModel(self.data, window)
         self.setModel(self.model)
 
         self.setTable()
@@ -89,42 +106,12 @@ class TableView(QTableView):
         self.setSelectionMode(QAbstractItemView.NoSelection)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
         self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-
+        # self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         # Set table headers
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
-        # # Let Delegate control table coloring
-        self.setItemDelegate(Delegate(self, self.window)) #!!!
-        self.setStyleSheet('''
-                                QTableView {
-                                    gridline-color: black;
-                                }
-
-                                QHeaderView::section {
-                                    padding: 4px;
-                                    border-style: none;
-                                    border-bottom: 1px solid black;
-                                    border-right: 1px solid black;
-                                }
-
-                                QHeaderView::section:horizontal {
-                                    border-top: 1px solid black;
-                                }
-
-                                QHeaderView::section:vertical {
-                                    border-left: 1px solid black;
-                                }
-
-                                QHeaderView::background-color:gray {
-                                    background-color: 200, 200, 200, 0,5;
-                                }
-
-                                QTableWidget QTableCornerButton::section {
-                                    border: 1px solid black;
-                                }''')
+        self.setStyleSheet(ColorStyle.tableStyleSheet)
 
         # self.show()
         self.setFixedWidth(self.tableWidth())
@@ -159,13 +146,14 @@ class TableView(QTableView):
         data = self.window.stat.get_data()
         self.window.table.model.updateData(data)
 
-        # Adjust table width to contents
-        self.setFixedWidth(self.tableWidth())
+        if self.window.map.numZones < 5:
+            # Adjust table width to contents
+            self.setFixedWidth(self.tableWidth())
 
-        # Adjust window width to table
-        # self.show()
-        self.app.processEvents() #???
-        self.window.adjustSize()
+            # Adjust window width to table
+            # self.show()
+            self.app.processEvents() #???
+            self.window.adjustSize()
 
     def saveData(self):
         pass
