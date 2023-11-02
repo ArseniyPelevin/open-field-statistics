@@ -124,13 +124,10 @@ class TimePeriodSettings:
 
         ''' Update time widgets based on loaded raw data '''
 
-        # with QSignalBlocker(self.startSelectedLine):
-        self.startSelectedLine.setRange(0., self.totalTime) #!!!
+        self.startSelectedLine.setRange(0., self.totalTime)
         self.startSelectedLine.setValue(self.params['startSelected'])
-        # with QSignalBlocker(self.endSelectedLine):
-        self.endSelectedLine.setValue(self.params['endSelected'])
         self.endSelectedLine.setRange(0., self.totalTime)
-        # with QSignalBlocker(self.periodLine):
+        self.endSelectedLine.setValue(self.params['endSelected'])
         self.periodLine.setRange(1., self.totalTime)
         self.periodLine.setValue(self.params['period'])
 
@@ -140,7 +137,7 @@ class TimePeriodSettings:
 
         with QSignalBlocker(self.timeRangeSlider):
             self.timeRangeSlider.setRange(0, self.totalTime / sliderStep)
-            self.timeRangeSlider.setValue([self.params['startSelected'],
+            self.timeRangeSlider.setValue([self.params['startSelected'] / sliderStep,
                                            self.params['endSelected'] / sliderStep])
 
         self.startSelectedLine.setEnabled(True)

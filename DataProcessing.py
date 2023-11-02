@@ -110,19 +110,21 @@ class DataProcessing():
         print(__name__, inspect.currentframe().f_code.co_name)
 
         df = (df
-              .rename(columns={'x': 'time', 'dz': 'z_num', 'z': 'z_time'})
+              .rename(columns={'x': 'time', 'dz': 'rearing_n', 'z': 'rearing_time'})
               .pivot_table(
                   index=index,
                   columns='zone',
-                  values=['time', 'dist', 'z_num', 'z_time'],
+                  values=['time', 'dist', 'rearing_n', 'rearing_time'],
                   aggfunc={'time': 'count', 'dist': 'sum',
-                           'z_num': 'sum', 'z_time': 'sum'}
+                           'rearing_n': 'sum', 'rearing_time': 'sum'}
               )
               )
 
         # Account for occasional one 0.1 s line leftover
-        # if df.loc[df.index[-1], 'time'] == 1:
-        #     df = df.drop(index=df.index[-1])
+        if ('time' in df.columns
+                and df.loc[df.index[-1], 'time'].sum() == 1):
+            df = df.drop(index=df.index[-1])
+
         return df
 
     # %%
@@ -140,10 +142,6 @@ class DataProcessing():
 
         if period == end:
             period += 0.1
-
-
-        # To access from other modules
-        # self.start, self.end, self.period = start, end, period #???
 
 #TODO mention this behavior in documentation
         # Make periods' index in the format 'period_start—period_end'
@@ -179,13 +177,8 @@ class DataProcessing():
         data = (self.df
                 .loc[start:end]
                 .pipe(self.pivot_zone_wise, grouper)
+                .set_axis(periods_index, axis='index')
                 )
-        print('\n!!!')
-        print(data)
-        print(periods_index)
-        print('???\n')
-        data = data.set_axis(periods_index, axis='index')
-
 
         # Aggregate data outside of selected_time
         data.loc['_not_selected'] = (pd
@@ -213,10 +206,10 @@ class DataProcessing():
 
                 # Convert time from 100 ms to 1 s
                 .assign(time=lambda data_: data_.time * 0.1)
-                .assign(z_time=lambda data_: data_.z_time * 0.1)
+                .assign(rearing_time=lambda data_: data_.rearing_time * 0.1)
 
                 # Calculate velocity
-                .assign(vel=lambda data_: data_.dist / data_.time)
+                .assign(velocity=lambda data_: data_.dist / data_.time)
 
                 # Round to 1 decimal, fill NA with 0
                 .astype(float)
@@ -228,19 +221,15 @@ class DataProcessing():
                 .reindex(columns=['Whole_field'] + zones,
                          index=pd.MultiIndex.from_product([
                              ['Total_time', 'Selected_time'] + periods_index,
-                             ['time', 'dist', 'vel', 'z_num', 'z_time']])
+                             self.params['statParams']])
                          )
-                # .rename(index={'time': 'Time (s)',
-                #                 'dist': 'Distance (cm)',
-                #                 'vel': 'Velocity (cm/s)',
-                #                 'z_num': 'Rearings number',
-                #                 'z_time': 'Rearings time (s)'},
-                #         level=1)
+                .rename(index={'time': 'Time (s)',
+                                'dist': 'Distance (cm)',
+                                'velocity': 'Velocity (cm/s)',
+                                'rearing_n': 'Rearings number',
+                                'rearing_time': 'Rearings time (s)'},
+                        level=1)
                 )
-
-        #???
-        # print(f'Test total time:\n\tEnd-start: {self.df.index[-1].total_seconds()}\n' +
-        #       f'\nTotal_time/Whole_field: {data.loc[("Total_time", "time"), "Whole_field"]}')
 
         return data
 
