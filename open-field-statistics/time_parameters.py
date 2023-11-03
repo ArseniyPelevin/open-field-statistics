@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QStyleFactory,
-    QDoubleSpinBox
+    QDoubleSpinBox, QAbstractSpinBox
 )
 from PyQt6.QtCore import (
     Qt, QSize, pyqtSlot, QEvent, QPointF, QVariantAnimation, QRegularExpression,
@@ -43,22 +43,31 @@ class TimeParameters:
 
         self.periodLabel = QLabel('Time period every ')
 
-        self.periodLine = QDoubleSpinBox(alignment = Qt.AlignRight)
+        self.periodLine = DoubleSpinBox(alignment=Qt.AlignRight)
         self.periodLine.setFixedWidth(60)
         self.periodLine.setDecimals(1)
         self.periodLine.setSuffix(' s')
+        self.periodLine.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.periodLine.setCorrectionMode('max')
+        self.periodLine.setKeyboardTracking(False)
         self.periodLine.setDisabled(True)
 
-        self.startSelectedLine = QDoubleSpinBox(alignment = Qt.AlignLeft)
+        self.startSelectedLine = DoubleSpinBox(alignment=Qt.AlignLeft)
         self.startSelectedLine.setFixedWidth(60)
         self.startSelectedLine.setDecimals(1)
         self.startSelectedLine.setSuffix(' s')
+        self.startSelectedLine.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.startSelectedLine.setCorrectionMode('min')
+        self.startSelectedLine.setKeyboardTracking(False)
         self.startSelectedLine.setDisabled(True)
 
-        self.endSelectedLine = QDoubleSpinBox(alignment = Qt.AlignRight)
+        self.endSelectedLine = DoubleSpinBox(alignment=Qt.AlignRight)
         self.endSelectedLine.setFixedWidth(60)
         self.endSelectedLine.setDecimals(1)
         self.endSelectedLine.setSuffix(' s')
+        self.endSelectedLine.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.endSelectedLine.setCorrectionMode('max')
+        self.endSelectedLine.setKeyboardTracking(False)
         self.endSelectedLine.setDisabled(True)
 
         self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
@@ -74,11 +83,11 @@ class TimeParameters:
         print(__name__, inspect.currentframe().f_code.co_name)
 
         # Update period
-        self.periodLine.editingFinished.connect(self.checkPeriod)
+        self.periodLine.valueChanged.connect(self.checkPeriod)
 
         # Update time range from text
-        self.startSelectedLine.editingFinished.connect(self.checkStartSelected)
-        self.endSelectedLine.editingFinished.connect(self.checkEndSelected)
+        self.startSelectedLine.valueChanged.connect(self.checkStartSelected)
+        self.endSelectedLine.valueChanged.connect(self.checkEndSelected)
 
         # Update time range from slider
         self.timeRangeSlider.sliderMoved.connect(self.sliderUpdateSelectedTime)
@@ -94,9 +103,8 @@ class TimeParameters:
         self.timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 3, Qt.AlignBottom)
 
         self.periodLayout = QHBoxLayout()
-        self.periodLayout.addWidget(self.periodLabel, alignment = Qt.AlignRight)
-        self.periodLayout.addWidget(self.periodLine, alignment = Qt.AlignRight)
-        # self.periodLayout.addWidget(self.secondsLabel, alignment = Qt.AlignRight)
+        self.periodLayout.addWidget(self.periodLabel, alignment=Qt.AlignRight)
+        self.periodLayout.addWidget(self.periodLine, alignment=Qt.AlignRight)
 
     def loadTimeVariables(self, stat):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -148,9 +156,11 @@ class TimeParameters:
         print(__name__, inspect.currentframe().f_code.co_name)
 
         period = self.periodLine.value()
+
+        errorMessage = ('Period should be in the range:\n'
+                        + f'1 s ≤ period < {self.selectedTime} s')
+
         if period > self.selectedTime:
-                errorMessage = ('Period should be in the range:\n'
-                                + f'1 s ≤ period < {self.selectedTime} s')
                 self.errorWarning(self.periodLine, errorMessage)
                 period = self.selectedTime
 
@@ -159,52 +169,38 @@ class TimeParameters:
     def checkStartSelected(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-#???
-        try:
-            start = self.startSelectedLine.value()
-        # Empty line was entered as start time, set start to 0
-        except ValueError:
-            start = 0
-            self.startSelectedLine.setValue(start)
-        else:
-            # Selected start > Selected end, back to initial value
-            if start >= self.params['endSelected']:
-                errorMessage = ('Start time should be in the range:\n'
-                                + f"0 s ≤ start time < {self.params['endSelected']} s")
-                self.errorWarning(self.startSelectedLine, errorMessage)
+        start = self.startSelectedLine.value()
 
-                start = self.params['startSelected']
-                self.startSelectedLine.setValue(start)
+        errorMessage = ('Start time should be in the range:\n'
+                        + f"0 s ≤ start time < {self.params['endSelected']} s")
+
+        # Selected start > Selected end, back to initial value
+        if start >= self.params['endSelected']:
+            self.errorWarning(self.startSelectedLine, errorMessage)
+            start = self.params['startSelected']
+            self.startSelectedLine.setValue(start)
 
         self.updateSelectedTime(start, self.params['endSelected'])
 
     def checkEndSelected(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-#???
-        try:
-            end = self.endSelectedLine.value()
-        # Empty line was entered as end time, set end to max total time
-        except ValueError:
-            end = self.totalTime
+        end = self.endSelectedLine.value()
+
+        errorMessage = ('End time should be in the range:\n'
+                        + f"{self.params['startSelected']} s < end time ≤ {self.totalTime} s")
+
+        # Selected end < Selected start, back to previous value
+        if end <= self.params['startSelected']:
+            self.errorWarning(self.endSelectedLine, errorMessage)
+            end = self.params['endSelected']
             self.endSelectedLine.setValue(end)
-        else:
-            errorMessage = ('End time should be in the range:\n'
-                            + f"{self.params['startSelected']} s < end time ≤ {self.totalTime} s")
 
-            # Selected end < Selected start, back to previous value
-            if end <= self.params['startSelected']:
-                self.errorWarning(self.endSelectedLine, errorMessage)
-
-                end = self.params['endSelected']
-                self.endSelectedLine.setValue(end)
-
-            # Selected end > total time, set Selected time to max total time
-            elif end > self.totalTime:
-                self.errorWarning(self.endSelectedLine, errorMessage)
-
-                end = self.totalTime
-                self.endSelectedLine.setValue(end)
+        # # Selected end > total time, set Selected time to max total time #!!!
+        # elif end > self.totalTime:
+        #     self.errorWarning(self.endSelectedLine, errorMessage)
+        #     end = self.totalTime
+        #     self.endSelectedLine.setValue(end)
 
         self.updateSelectedTime(self.params['startSelected'], end)
 
@@ -247,13 +243,13 @@ class TimeParameters:
 
         ''' Update path while Selected time slider is being moved '''
 
-        start, end = [x/10 for x in value] #self.timeRangeSlider.value()]
+        start, end = [x/10 for x in value]
 
         # Update values in text editors based on slider. Block their signals
-        # with QSignalBlocker(self.startSelectedLine): #!!!
-        self.startSelectedLine.setValue(start)
-        # with QSignalBlocker(self.endSelectedLine):
-        self.endSelectedLine.setValue(end)
+        with QSignalBlocker(self.startSelectedLine):
+            self.startSelectedLine.setValue(start)
+        with QSignalBlocker(self.endSelectedLine):
+            self.endSelectedLine.setValue(end)
 
         self.map.updateMapPath(start, end)
         # Do not update SelectedTime values here while slider is being moved
@@ -293,3 +289,16 @@ class TimeParameters:
         self.params['period'] = period
 
         self.window.table.fillTable()
+
+class DoubleSpinBox(QDoubleSpinBox):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def fixup(self, text):
+        if self.correctionMode == 'min':
+            self.setValue(self.minimum())
+        elif self.correctionMode == 'max':
+            self.setValue(self.maximum())
+
+    def setCorrectionMode(self, correctionMode):
+        self.correctionMode = correctionMode

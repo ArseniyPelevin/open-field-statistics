@@ -233,7 +233,7 @@ class DataProcessing():
             data = data.loc[['Total_time', 'Selected_time']]
         # Do not show selected_time if it is no less than total_time
         if abs(total_time - selected_time) < 0.5:
-            data = data.drop(index='Selected_time')
+            data = data.drop(index='Selected_time', level=0)
 
         return data
 

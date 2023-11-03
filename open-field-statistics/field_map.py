@@ -280,7 +280,7 @@ class MapWidget(QLabel):
         self.updateMapZones()
         self.numZones = 0
         # self.table.setcolumnCount(1)
-        self.addNewZone(numNewZones = numNewZones)
+        self.addNewZone(numNewZones=numNewZones)
 
     def mapBtnToggled(self, checked, x=-1, y=-1, s=-1):
         print(__name__, inspect.currentframe().f_code.co_name)
