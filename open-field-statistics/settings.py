@@ -53,8 +53,8 @@ class Settings(QDialog):
     def loadSettings(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        if 'RecentSettings.json' in os.listdir():
-            with open('RecentSettings.json', 'r', newline='') as file:
+        if r'temp\recent_settings.json' in os.listdir():
+            with open(r'temp\recent_settings.json', 'r', newline='') as file:
                 self.settings = json.load(file)
         else:
             self.settings = DEFAULT_SETTINGS
@@ -93,7 +93,7 @@ class Settings(QDialog):
     def saveRecentParameters(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        with open('RecentSettings.json', 'w+', newline='') as file:
+        with open(r'temp\recent_settings.json', 'w+', newline='') as file:
             json.dump(self.settings, file, indent='\t')
 
     def createFileGroup(self):

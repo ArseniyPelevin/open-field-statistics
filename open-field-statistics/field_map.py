@@ -17,7 +17,7 @@ from PyQt6.QtGui import (
 
 import superqt
 
-from ColorStyle import ColorStyle
+from color_style import ColorStyle
 
 class MapWidget(QLabel):
     def __init__(self, window):
@@ -224,7 +224,7 @@ class MapWidget(QLabel):
             # Add new table column
             # header = QTableWidgetItem(f'Zone {self.numZones}')
             # num = self.table.columnCount()
-            # self.table.setColumnCount(num + 1)
+            # self.table.setcolumnCount(num + 1)
             # self.table.setHorizontalHeaderItem(num, header)
 
         # Uncheck all map buttons, update table
@@ -266,22 +266,22 @@ class MapWidget(QLabel):
         numNewZones = 2  # For halves or center/periphery
 
         # Split field vertically into two halves
-        if newBtn == 'Vertical_halves':
+        if newBtn == 'vertical_halves':
             self.zoneCoord[:, :nX//2] = 1
             self.zoneCoord[:, nX//2:] = 2
 
         # Split field horizontally into two halves
-        elif newBtn == 'Horizontal_halves':
+        elif newBtn == 'horizontal_halves':
             self.zoneCoord[:nY//2, :] = 1
             self.zoneCoord[nY//2:, :] = 2
 
         # Split field into central and peripheral zones
-        elif newBtn == 'Wall':
+        elif newBtn == 'wall':
             self.zoneCoord[:, :] = 2  # Walls
             wall = int(np.ceil(min(nX, nY) / 4))
             self.zoneCoord[wall : -wall, wall : -wall] = 1  # Center
 
-        elif newBtn == 'Wall-corners':
+        elif newBtn == 'wall_corners':
             self.zoneCoord[:, :] = 3  # Corners
             wall = int(np.ceil(min(nX, nY) / 4))
             self.zoneCoord[wall : -wall, :] = 2  # Walls
@@ -291,7 +291,7 @@ class MapWidget(QLabel):
 
         self.updateMapZones()
         self.numZones = 0
-        # self.table.setColumnCount(1)
+        # self.table.setcolumnCount(1)
         self.addNewZone(numNewZones = numNewZones)
 
     def mapBtnToggled(self, checked, x=-1, y=-1, s=-1):
@@ -314,13 +314,13 @@ class MapWidget(QLabel):
         self.addZoneBtn.setEnabled(True)
 
         # Assign the area checked with a custom button to the new zone
-        if buttonType == 'Cell':
+        if buttonType == 'cell':
             self.zoneCoord[x][y] = zoneValue
-        elif buttonType == 'Column':
+        elif buttonType == 'column':
             self.zoneCoord[:,y] = zoneValue
-        elif buttonType == 'Row':
+        elif buttonType == 'row':
             self.zoneCoord[x,:] = zoneValue
-        elif buttonType == 'Square':
+        elif buttonType == 'square':
             self.zoneCoord[[s, -s-1], s:self.numLasersX-s] = zoneValue
             self.zoneCoord[s:self.numLasersY-s, [s, -s-1]] = zoneValue
 
@@ -459,7 +459,7 @@ class MapWidget(QLabel):
             button.setCheckable(True)
 
             #TODO Add sys._MEIPASS here to package into one file
-            pixmapFile = os.path.join('Area_Buttons_pixmaps', f'{name}.png')
+            pixmapFile = os.path.join('button_pixmaps', f'{name}.png')
             pixmap = QPixmap(pixmapFile).scaled(button.size())
 
             button.setIcon(QIcon(pixmap))
@@ -474,7 +474,7 @@ class MapWidget(QLabel):
         # New area type button is selected, change area type
         self.areaBtnGroup.idToggled.connect(self.newAreaButton)
 
-        # Set Cell (id = 0) as default area type
+        # Set cell (id = 0) as default area type
         self.areaBtnGroup.button(0).setChecked(True)
 
         self.clearMapButton(size)
@@ -494,7 +494,7 @@ class MapWidget(QLabel):
         self.clearMapButton = QPushButton()
         self.clearMapButton.setFixedSize(size, size)
 
-        pixmapFile = os.path.join('Area_Buttons_pixmaps', 'Clear.png')
+        pixmapFile = os.path.join('button_pixmaps', 'clear.png')
         clearBtnPixmap = QPixmap(pixmapFile).scaled(self.clearMapButton.size())
         self.clearMapButton.setIcon(QIcon(clearBtnPixmap))
         self.clearMapButton.setIconSize(self.clearMapButton.size())
@@ -506,7 +506,7 @@ class MapWidget(QLabel):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.numZones = 0
-        # self.table.setColumnCount(1)
+        # self.table.setcolumnCount(1)
 
         # Deselect all map areas
         self.zoneCoord[:, :] = 0
@@ -515,7 +515,7 @@ class MapWidget(QLabel):
         # Uncheck all map buttons, update table
         self.updateZoneNumber()
 
-        # Set Cell (id = 0) as the default area type
+        # Set cell (id = 0) as the default area type
         self.areaBtnGroup.button(0).setChecked(True)
 
     def defineAreaTypes(self):
@@ -526,9 +526,9 @@ class MapWidget(QLabel):
         make stacked layout with map buttons of different types
         '''
 
-        self.customAreas = ['Cell', 'Column', 'Row', 'Square']
-        self.predefinedAreas = ['Vertical_halves', 'Horizontal_halves',
-                                'Wall', 'Wall-corners']
+        self.customAreas = ['cell', 'column', 'row', 'square']
+        self.predefinedAreas = ['vertical_halves', 'horizontal_halves',
+                                'wall', 'wall_corners']
         customAreaMethods = [self.cellMapButtons, self.columnMapButtons,
                                   self.rowMapButtons, self.squareMapButtons]
 
@@ -586,7 +586,7 @@ class MapWidget(QLabel):
             buttonRect = button.geometry()
 
             # Square buttons are not rectangles, their shape is defined by bitmap mask
-            if self.currentAreaType == 'Square':
+            if self.currentAreaType == 'square':
                 buttonRegion = button.mask()
 
                 # Iterate over all pixels within the selected rect

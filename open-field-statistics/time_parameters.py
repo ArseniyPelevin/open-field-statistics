@@ -1,4 +1,3 @@
-
 import numpy as np
 import math as m
 import inspect
@@ -23,7 +22,7 @@ from PyQt6.QtGui import (
 from superqt import QRangeSlider
 
 
-class TimePeriodSettings:
+class TimeParameters:
 
     def __init__(self, window):
         print(__name__, inspect.currentframe().f_code.co_name)

@@ -15,13 +15,12 @@ from PyQt6.QtGui import QFontMetrics, QIcon, QAction
 
 from superqt import QRangeSlider
 
-from DataProcessing import DataProcessing
-
-from Map import MapWidget
-from Time import TimePeriodSettings
-from Table import TableView
-from Settings import Settings
-from Info import Info
+from settings import Settings
+from data_processing import DataProcessing
+from field_map import MapWidget
+from time_parameters import TimeParameters
+from output_table import TableView
+from app_info import Info
 
 
 class MainWindow(QMainWindow):
@@ -43,7 +42,7 @@ class MainWindow(QMainWindow):
         self.settings = Settings(self)
         self.map = MapWidget(self)
         # self.map.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-        self.time = TimePeriodSettings(self)
+        self.time = TimeParameters(self)
         self.stat = DataProcessing(self.params, self.map.zoneCoord)
         self.table = TableView(self, app)
 

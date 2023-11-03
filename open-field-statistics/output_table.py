@@ -18,7 +18,7 @@ from PyQt6.QtGui import QColor
 
 from superqt import QRangeSlider
 
-from ColorStyle import ColorStyle
+from color_style import ColorStyle
 
 
 class TableModel(QtCore.QAbstractTableModel):

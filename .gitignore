@@ -4,7 +4,7 @@ dist/
 *.spec
 *.bat
 *.png
-RecentSettings.*
+recent_settings.*
 MANIFEST
 
 
