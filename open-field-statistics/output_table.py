@@ -42,12 +42,13 @@ class TableModel(QtCore.QAbstractTableModel):
 
         if role == Qt.ItemDataRole.BackgroundRole:
             color = (255, 255, 255)  # Default white
+            zone = self._data.columns[index.column()]
             # Overlap of colored zone and gray even block
             if index.column() != 0 and (index.row() // numStatParam) % 2 == 1:
-                color = ColorStyle.zoneColorsGray[index.column()]
+                color = ColorStyle.zoneColorsGray[zone]
             # Colored zone
             elif index.column() != 0:
-                color = (*ColorStyle.zoneColors[index.column()], 80)
+                color = (*ColorStyle.zoneColors[zone], 80)
             # Gray even block
             elif (index.row() // numStatParam) % 2 == 1:
                 color = (200, 200, 200, 120)
@@ -69,9 +70,14 @@ class TableModel(QtCore.QAbstractTableModel):
         # Section is the index of the column/row.
         if role == Qt.DisplayRole:
             if orientation == Qt.Horizontal:
-                return str(self._data.columns[section])
+                zone = self._data.columns[section]
+                # In table header display 'Zone n' instead of just 'n'
+                if zone != 'Whole_field':
+                    zone = f'Zone {zone}'
+                return zone
 
             if orientation == Qt.Vertical:
+                # Makeshift for multi header
                 return f'{self._data.index[section][0]}, {self._data.index[section][1]}'
 
     def updateData(self, data):
@@ -90,9 +96,10 @@ class TableView(QTableView):
 
         self.window = window
         self.app = app
-        self.data = self.window.stat.dummy_data
 
-        self.model = TableModel(self.data, window)
+        data = self.window.stat.dummy_data
+        data = self.renameStatisticsHeaders(data)
+        self.model = TableModel(data, window)
         self.setModel(self.model)
 
         self.setTable()
@@ -117,12 +124,11 @@ class TableView(QTableView):
         self.setFixedWidth(self.tableWidth())
         self.adjustSize()
 
-
     def tableWidth(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        # self.app.processEvents()
-        # self.app.processEvents()
+        self.app.processEvents()
+        self.app.processEvents()
         tableWidth = self.verticalHeader().width() + \
                       self.horizontalHeader().length() + \
                       self.frameWidth() * 2
@@ -138,12 +144,23 @@ class TableView(QTableView):
     #                   self.frameWidth() * 2
     #     return tableHeight
 
+    def renameStatisticsHeaders(self, data):
+        return (data
+                .rename(index={'time': 'Time (s)',
+                               'dist': 'Distance (cm)',
+                               'velocity': 'Velocity (cm/s)',
+                               'rearing_n': 'Rearings number',
+                               'rearing_time': 'Rearings time (s)'},
+                        )
+                )
+
     def fillTable(self):
         print(__name__, inspect.currentframe().f_code.co_name, inspect.currentframe().f_back.f_code.co_name)
 
         ''' Fill table with statistics '''
 
         data = self.window.stat.get_data()
+        data = self.renameStatisticsHeaders(data)
         self.window.table.model.updateData(data)
 
         if self.window.map.numZones < 5:

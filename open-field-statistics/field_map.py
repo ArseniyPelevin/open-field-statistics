@@ -101,7 +101,6 @@ class MapWidget(QLabel):
 
         mapPainter = QPainter(self.mapCanvas)
 
-        # mapPainter.drawPixmap(0, 0, self.mapCanvas.width(), self.mapCanvas.height(), self.gridLayer)
         mapPainter.drawPixmap(0, 0, self.gridLayer)
         mapPainter.drawPixmap(0, 0, self.zoneLayer)
         mapPainter.drawPixmap(0, 0, self.pathLayer)
@@ -132,7 +131,6 @@ class MapWidget(QLabel):
 
         self.updateMap()
 
-    # def updateMapPath(self, iStart, iEnd): #!!!
     def updateMapPath(self, start, end):
         print(__name__, inspect.currentframe().f_code.co_name)
 
@@ -146,8 +144,6 @@ class MapWidget(QLabel):
         pathPainter = QPainter(self.pathLayer)
 
         pathPainter.setPen(QPen(Qt.red, 2))
-        # pathPainter.drawPolyline(self.pathPoints[iStart:iEnd])
-        # pathPainter.drawPolyline(self.makePath[iStart:iEnd])
         pathPainter.drawPolyline(self.makePath(self.window.stat.df[start:end]))
 
         pathPainter.end()
@@ -158,13 +154,6 @@ class MapWidget(QLabel):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         ''' Make array of path QPoints for visualization '''
-
-        # self.pathPoints = []
-        # for _, row in data.iterrows():
-        #     x = row['x'] * self.cellX - self.cellX / 2
-        #     y = row['y'] * self.cellY - self.cellY / 2
-        #     self.pathPoints.append(QPointF(x, y))
-        # self.pathPoints = np.array(self.pathPoints)
 
         size = df.shape[0]
         polyline = QPolygonF([QPointF(0, 0)] * size)
@@ -221,12 +210,6 @@ class MapWidget(QLabel):
         for i in range(numNewZones):
             self.numZones += 1
 
-            # Add new table column
-            # header = QTableWidgetItem(f'Zone {self.numZones}')
-            # num = self.table.columnCount()
-            # self.table.setcolumnCount(num + 1)
-            # self.table.setHorizontalHeaderItem(num, header)
-
         # Uncheck all map buttons, update table
         self.updateZoneNumber()
 
@@ -253,7 +236,12 @@ class MapWidget(QLabel):
                 with QSignalBlocker(button):
                     button.setChecked(False)
 
-
+        # for zone in range(1, self.numZones + 1):
+        #     if zone not in self.zoneCoord:
+        #         self.zoneCoord = np.where(self.zoneCoord < zone,
+        #                                   self.zoneCoord,
+        #                                   self.zoneCoord - 1)
+        #         self.numZones -= 1
         self.setStyleSheet(ColorStyle.mapStyleSheet(self.numZones))
         self.window.table.fillTable()
 

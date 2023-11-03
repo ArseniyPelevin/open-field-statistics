@@ -11,23 +11,29 @@ class DataProcessing():
         self.zoneCoord = zoneCoord
 
         self.has_file = False
+        self.zones = np.array([])
         self.dummy_data = self.make_dummy_data()
 
     def make_dummy_data(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        return pd.DataFrame(
-            data=np.full(shape=(len(self.params['statParams']),
-                                self.zoneCoord.max() + 1),
-                         fill_value=''),
-            index=pd.MultiIndex.from_product([['Total_time'],
-                                              self.params['statParams']]),
-            columns=(['Whole_field']
-                     + [f'Zone {i}' for i in range(1, self.zoneCoord.max() + 1)])
-        )
+        ''' Make empty data to display table before any file was loaded '''
+
+        return (pd
+            .DataFrame(
+                data=np.full(shape=(len(self.params['statParams']),
+                                    len(self.zones) + 1),  # Whole_field + zones
+                             fill_value=''),
+                index=pd.MultiIndex.from_product([['Total_time'],
+                                                  self.params['statParams']]),
+                columns=(['Whole_field'] + self.zones.tolist())
+                )
+            )
 
     def read(self, file):
         print(__name__, inspect.currentframe().f_code.co_name)
+
+        ''' Read loaded .csv file with raw data and save as pandas dataframe '''
 
         self.df = (pd
                    .read_csv(file,
@@ -54,10 +60,10 @@ class DataProcessing():
 
         return int(max_x), int(max_y)
 
-# %%
-
     def process_raw_data(self, df):
         print(__name__, inspect.currentframe().f_code.co_name)
+
+        ''' Preprocess raw data independent of time and zone parameters '''
 
         # Exclude rows with any of four coordinates missing
 #TODO Let user define this behavior in Settings (Start of recording/First beam break)
@@ -127,10 +133,12 @@ class DataProcessing():
 
         return df
 
-    # %%
-
     def get_data(self):
         print(__name__, inspect.currentframe().f_code.co_name)
+
+        # List of existing zones (some could have been fully deselected)
+        self.zones = np.unique(self.zoneCoord)
+        self.zones = self.zones[self.zones > 0]
 
         # Without loaded file return an empty table
         if not self.has_file:
@@ -140,18 +148,16 @@ class DataProcessing():
         end = self.params['endSelected']
         period = self.params['period']
 
-        if period == end:
-            period += 0.1
-
 #TODO mention this behavior in documentation
         # Make periods' index in the format 'period_start—period_end'
         # Periods are relative to the start of Selected_time interval,
         # not the start of Total_time of recording.
         # End of the last period corresponds to the end of Selected_time
-        selected = np.round(end - start, 1)
-        periods = zip(np.arange(0, selected, period),
-                      np.append(np.arange(period, selected, period),
-                                selected))
+        total_time = self.df.index[-1].total_seconds()
+        selected_time = np.round(end - start, 1)
+        periods = zip(np.arange(0, selected_time, period),
+                      np.append(np.arange(period, selected_time, period),
+                                selected_time))
         periods_index = []
         for left, right in periods:
             periods_index.append(f'{left}—{right}')
@@ -159,9 +165,6 @@ class DataProcessing():
         start = pd.to_timedelta(start, unit='s')
         end = pd.to_timedelta(end, unit='s')
         period = pd.to_timedelta(period, unit='s')
-
-        # List of zones. Starts from 1 to exclude non-selected cells with zone=0
-        zones = [*range(1, self.zoneCoord.max() + 1)]
 
         # Define zone of each timestamp
         self.df['zone'] = self.zoneCoord[self.df['y'].astype(int),
@@ -210,35 +213,32 @@ class DataProcessing():
 
                 # Calculate velocity
                 .assign(velocity=lambda data_: data_.dist / data_.time)
+                .unstack().stack(level=0, future_stack=True)
+
+                # Reorder and rename index values for final output
+                .reindex(columns=['Whole_field'] + self.zones.tolist(),
+                         index=pd.MultiIndex.from_product([
+                             ['Total_time', 'Selected_time'] + periods_index,
+                             self.params['statParams']])
+                         )
 
                 # Round to 1 decimal, fill NA with 0
                 .astype(float)
                 .round(decimals=1)
                 .fillna(0)
-                .unstack().stack(level=0, future_stack=True)
-
-                # Reorder and rename index values for final output
-                .reindex(columns=['Whole_field'] + zones,
-                         index=pd.MultiIndex.from_product([
-                             ['Total_time', 'Selected_time'] + periods_index,
-                             self.params['statParams']])
-                         )
-                .rename(index={'time': 'Time (s)',
-                                'dist': 'Distance (cm)',
-                                'velocity': 'Velocity (cm/s)',
-                                'rearing_n': 'Rearings number',
-                                'rearing_time': 'Rearings time (s)'},
-                        level=1)
                 )
 
-        return data
+        # Do not show single period which is no less than selected_time
+        if abs(selected_time - period.total_seconds()) < 0.5:
+            data = data.loc[['Total_time', 'Selected_time']]
+        # Do not show selected_time if it is no less than total_time
+        if abs(total_time - selected_time) < 0.5:
+            data = data.drop(index='Selected_time')
 
+        return data
 
 def save(data, file=r'Trials\Test_pandas_output_2.csv'):
     print(__name__, inspect.currentframe().f_code.co_name)
 
     with open(file, 'w+', newline='') as output:
         data.to_csv(output, sep=';', decimal='.')
-
-
-# stat = DataProcessing_pandas(*temp_args())
