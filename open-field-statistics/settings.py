@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QGroupBox, QCheckBox, QSpinBox, QDoubleSpinBox, QComboBox
 )
 from PyQt6.QtCore import (
-    Qt, QSize, pyqtSlot, QEvent, QPointF, QVariantAnimation, QRegularExpression
+    Qt, QSize, pyqtSlot, QEvent, QPointF, QVariantAnimation, QRegularExpression, QDir
     )
 from PyQt6.QtGui import (
     QFontMetrics, QIcon,
@@ -23,15 +23,27 @@ from PyQt6.QtGui import (
 
 from superqt import QRangeSlider
 
+DEFAULT_FOLDER_TYPES = ['loadData', 'params', 'saveData', 'saveMap']
 ALL_STAT_PARAMS = ['time', 'dist', 'velocity', 'rearing_n', 'rearing_time']
 DEFAULT_SETTINGS = {
+    # File parameters:
+    'dirs': {folder: None for folder in DEFAULT_FOLDER_TYPES},
+    'files': {},
+
+    # Field parameters:
     'numLasersX': 16,
     'numLasersY': 16,
     'boxSideX': 40.,      # Physical dimensions of the filed, cm
     'boxSideY': 40.,
+
+    # Statistics parameters
     'statParams': ALL_STAT_PARAMS,
+
+    # Sampling parameters
     'samplingFrequency': 0.1,
     'startTime': 1,  # First beam break
+
+    # Output parameters:
     'separator': ';',
     'decimal': ','
     }
@@ -53,15 +65,14 @@ class Settings(QDialog):
     def loadSettings(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        if r'temp\recent_settings.json' in os.listdir():
-            with open(r'temp\recent_settings.json', 'r', newline='') as file:
+        if r'recent_settings.json' in os.listdir('temp'):
+            folder = os.path.join('temp', 'recent_settings.json')
+            with open(folder, 'r', newline='') as file:
                 self.settings = json.load(file)
         else:
             self.settings = DEFAULT_SETTINGS
 
         self.window.params.update(self.settings)
-
-
 
     def settingsDialog(self):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -93,7 +104,8 @@ class Settings(QDialog):
     def saveRecentParameters(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        with open(r'temp\recent_settings.json', 'w+', newline='') as file:
+        folder = os.path.join('temp', 'recent_settings.json')
+        with open(folder, 'w+', newline='') as file:
             json.dump(self.settings, file, indent='\t')
 
     def createFileGroup(self):
@@ -102,7 +114,60 @@ class Settings(QDialog):
         fileGroup = QGroupBox('Default files locations')
         fileGroupLayout = QGridLayout(fileGroup)
 
+        folders = DEFAULT_FOLDER_TYPES
+        items = ['caption', 'label', 'lineEdit', 'button', 'dialog']
+        self.folderItems = pd.DataFrame(index=folders, columns=items)
+
+        self.folderItems.loc[:, 'caption'] = [
+            'Location of input raw data files:',
+            'Location of saved parameters:',
+            'Location of output statistics:',
+            'Location of output map image:'
+            ]
+
+        for folder in folders:
+            self.folderItems.loc[folder, 'label'] = QLabel(
+                self.folderItems.loc[folder, 'caption'])
+            self.folderItems.loc[folder, 'lineEdit'] = QLineEdit()
+            self.folderItems.loc[folder, 'lineEdit'].setFixedWidth(300)
+            self.folderItems.loc[folder, 'lineEdit'].setText(
+                self.tempSettings['dirs'][folder])
+            self.folderItems.loc[folder, 'button'] = QPushButton('...')
+            self.folderItems.loc[folder, 'button'].setFixedWidth(20)
+            self.folderItems.loc[folder, 'dialog'] = QFileDialog()
+
+            self.folderItems.loc[folder, 'button'].clicked.connect(
+                lambda _checked, folder_=folder:
+                    self.tempSettings['dirs'].update(
+                        {folder_: self.selectFolder(folder_)}))
+
+            self.folderItems.loc[folder, 'lineEdit'].editingFinished.connect(
+                lambda text, folder_=folder:
+                    self.tempSettings['dirs'].update({folder_: text}))
+
+            lineNum = 2 * self.folderItems.index.get_loc(folder)
+            fileGroupLayout.addWidget(self.folderItems.loc[folder, 'label'],
+                                      lineNum, 0)
+            fileGroupLayout.addWidget(self.folderItems.loc[folder, 'lineEdit'],
+                                      lineNum + 1, 0)
+            fileGroupLayout.addWidget(self.folderItems.loc[folder, 'button'],
+                                      lineNum + 1, 1)
+
         return fileGroup
+
+    def selectFolder(self, folder):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
+        folderName = self.folderItems.loc[folder, 'dialog'].getExistingDirectory(
+            parent=self,
+            caption=self.folderItems.loc[folder, 'caption'],
+            directory=self.tempSettings['dirs'][folder]
+            )
+        if folderName:
+            self.tempSettings['dirs'][folder] = folderName
+            self.folderItems.loc[folder, 'lineEdit'].setText(folderName)
+        return folderName
+
 
     def createFieldParametersGroup(self):
         print(__name__, inspect.currentframe().f_code.co_name)

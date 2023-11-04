@@ -144,10 +144,11 @@ class MainWindow(QMainWindow):
         ''' Load raw data file, get statistics, update map and table '''
 
         #TODO Remember file location
-        inputFileName, _filter = QFileDialog.getOpenFileName(self,
-                              caption='Open .csv file',
-                              directory=r'C:\OpenField',
-                              filter='CSV files (*.csv)')
+        inputFileName, _filter = QFileDialog.getOpenFileName(
+            parent=self,
+            caption='Open .csv file',
+            directory=r'C:\OpenField',
+            filter='CSV files (*.csv)')
         # The extarnal program that generates the raw data saves
         # .csv files to C:\OpenField by default, thus predefined location
 
