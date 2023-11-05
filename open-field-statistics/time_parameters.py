@@ -113,16 +113,13 @@ class TimeParameters:
 
         self.totalTime = stat.df.index[-1].total_seconds()
 
-        if 'startSelected' not in self.params:
-            self.params['startSelected'] = 0
-        if 'endSelected' not in self.params:
-            self.params['endSelected'] = self.totalTime
+        self.params['startSelected'] = 0
+        self.params['endSelected'] = self.totalTime
 
         self.selectedTime = round(self.params['endSelected']
                                   - self.params['startSelected'], 1)
 
-        if 'period' not in self.params:
-            self.params['period'] = self.selectedTime
+        self.params['period'] = self.selectedTime
 
         self.loadTimeWidgets()
 

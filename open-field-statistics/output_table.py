@@ -171,6 +171,3 @@ class TableView(QTableView):
             # self.show()
             self.app.processEvents() #???
             self.window.adjustSize()
-
-    def saveData(self):
-        pass

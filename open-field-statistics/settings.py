@@ -139,27 +139,32 @@ class Settings():
                 ]
 
             for folder in folders:
+                # Create label
                 self.folderItems.loc[folder, 'label'] = QLabel(
                     self.folderItems.loc[folder, 'caption'])
+                # Create LineEdit to write default folders path
                 self.folderItems.loc[folder, 'lineEdit'] = QLineEdit()
                 self.folderItems.loc[folder, 'lineEdit'].setFixedWidth(300)
                 self.folderItems.loc[folder, 'lineEdit'].setText(
                     self.tempSettings['dirs'][folder])
+                # Create buttons to select default folders
                 self.folderItems.loc[folder, 'button'] = QPushButton('...')
                 self.folderItems.loc[folder, 'button'].setFixedWidth(20)
+                # Create dialog for folder selection
                 self.folderItems.loc[folder, 'dialog'] = QFileDialog()
 
-                self.folderItems.loc[folder, 'button'].clicked.connect(
-                    lambda _checked, folder_=folder:
-                        self.tempSettings['dirs'].update(
-                            {folder_: self.selectFolder(folder_)}))
-
+                # Set signals of LineEdit and button
                 self.folderItems.loc[folder, 'lineEdit'].editingFinished.connect(
                     lambda folder_=folder:
                         self.tempSettings['dirs'].update(
                             {folder_:
                              self.folderItems.loc[folder_, 'lineEdit'].text()}))
+                self.folderItems.loc[folder, 'button'].clicked.connect(
+                    lambda _checked, folder_=folder:
+                        self.tempSettings['dirs'].update(
+                            {folder_: self.selectFolder(folder_)}))
 
+                # Add created widgets to fileGroupLayout
                 lineNum = 2 * self.folderItems.index.get_loc(folder)
                 fileGroupLayout.addWidget(self.folderItems.loc[folder, 'label'],
                                           lineNum, 0)
