@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
         saveMap.triggered.connect(lambda x: x)
 
         settingsAction = QAction('Settings', self)
-        settingsAction.triggered.connect(self.settings.settingsDialog)
+        settingsAction.triggered.connect(self.settings.openSettingsDialog)
 
         infoAction = QAction('Info', self)
         infoAction.triggered.connect(lambda: Info(self))
