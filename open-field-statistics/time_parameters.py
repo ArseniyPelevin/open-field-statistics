@@ -302,3 +302,12 @@ class DoubleSpinBox(QDoubleSpinBox):
 
     def setCorrectionMode(self, correctionMode):
         self.correctionMode = correctionMode
+
+    def wheelEvent(self, event):
+        event.ignore()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Up or event.key() == Qt.Key.Key_Down:
+            event.ignore()
+        else:
+            super().keyPressEvent(event)
