@@ -145,6 +145,8 @@ class TableView(QTableView):
     #     return tableHeight
 
     def renameStatisticsHeaders(self, data):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
         return (data
                 .rename(index={'time': 'Time (s)',
                                'dist': 'Distance (cm)',
@@ -155,13 +157,13 @@ class TableView(QTableView):
                 )
 
     def fillTable(self):
-        print(__name__, inspect.currentframe().f_code.co_name, inspect.currentframe().f_back.f_code.co_name)
+        print(__name__, inspect.currentframe().f_code.co_name)
 
         ''' Fill table with statistics '''
 
         data = self.window.stat.get_data()
         data = self.renameStatisticsHeaders(data)
-        self.window.table.model.updateData(data)
+        self.model.updateData(data)
 
         if self.window.map.numZones < 5:
             # Adjust table width to contents

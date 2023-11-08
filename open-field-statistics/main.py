@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import pandas as pd
 import inspect
 
@@ -39,12 +40,12 @@ class MainWindow(QMainWindow):
         # self.setVariables()
 
         self.params = {}
+        self.file = File(self)
         self.settings = Settings(self)
-        self.file = File(self, self.settings.settings)
         self.map = MapWidget(self)
         # self.map.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.time = TimeParameters(self)
-        self.stat = DataProcessing(self.params, self.map.zoneCoord)
+        self.stat = DataProcessing(self.params)#, self.map.zoneCoord)
         self.table = TableView(self, app)
 
         self.setMenu()
@@ -72,12 +73,16 @@ class MainWindow(QMainWindow):
     def setLayouts(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
+#FIXME It is potentially source of bugs with new settings!!!
         self.controlLayout = QGridLayout()
         self.controlLayout.addWidget(self.file.loadFileButton, 0, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.file.fileNameLabel, 0, 1, 1, 2)
+
+        # Load map widgets to window's layout
         self.controlLayout.addWidget(self.map.addZoneBtn, 1, 1, 1, 1, Qt.AlignRight)
         self.controlLayout.addLayout(self.map.areaBtnLayout, 2, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.map, 2, 1, 1, 1, Qt.AlignLeft)
+
         self.controlLayout.addLayout(self.time.periodLayout, 4, 0, 1, 2,
                                      (Qt.AlignRight | Qt.AlignBottom))
         self.controlLayout.addLayout(self.time.timeRangeLayout, 5, 0, 1, 2, Qt.AlignBottom)
@@ -102,11 +107,10 @@ class MainWindow(QMainWindow):
         container.setLayout(self.generalLayout)
         self.setCentralWidget(container)
 
+    # def closeEvent(self, event):
+    #     print(__name__, inspect.currentframe().f_code.co_name)
 
-    def closeEvent(self, event):
-        print(__name__, inspect.currentframe().f_code.co_name)
-
-        self.settings.saveRecentParameters()
+    #     self.settings.saveRecentSettings()
 
     # def resizeEvent(self, e):
     #     # try:
@@ -121,7 +125,6 @@ class MainWindow(QMainWindow):
     #         self.drawMap()
     #     except AttributeError:
     #         raise
-
 
 
 if __name__ == '__main__':

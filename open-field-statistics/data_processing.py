@@ -4,11 +4,11 @@ import inspect
 
 
 class DataProcessing():
-    def __init__(self, params, zoneCoord):
+    def __init__(self, params):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.params = params
-        self.zoneCoord = zoneCoord
+        self.zoneCoord = self.params['zoneCoord']
 
         self.has_file = False
         self.zones = np.array([])
@@ -30,35 +30,25 @@ class DataProcessing():
                 )
             )
 
-    def read(self, file):
+    def read(self, df):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         ''' Read loaded .csv file with raw data and save as pandas dataframe '''
 
-        self.df = (pd
-                   .read_csv(file,
-                         sep=None,   # Uses 'csv.Sniffer' for decimal separator,
-                         # needs python engine
-                         engine='python',
-                         # engine='c',  # Needs specified decimal separator
-                         parse_dates=[0], date_format='%H:%M:%S.%f',
-                         names=['time', 'x1', 'x2', 'y1', 'y2', 'z'], header=0,
-                         index_col=0
-                         )
-                   .pipe(self.process_raw_data)
-                   )
-
-        self.has_file = True
-
         # Check that loaded data fit current numLasers parameters
-        max_x = self.df[['x1', 'x2']].max(axis=None)
-        max_y = self.df[['y1', 'y2']].max(axis=None)
+        max_x = df[['x1', 'x2']].max(axis=None)
+        max_y = df[['y1', 'y2']].max(axis=None)
         if max_x <= self.params['numLasersX']:
             max_x = 0
-        if max_y <= self.params['numLasersX']:
+        if max_y <= self.params['numLasersY']:
             max_y = 0
 
-        return int(max_x), int(max_y)
+        # Data correspond to field settings
+        if not (max_x or max_y):
+            self.df = self.process_raw_data(df)
+            self.has_file = True
+
+        return max_x, max_y
 
     def process_raw_data(self, df):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -135,6 +125,10 @@ class DataProcessing():
 
     def get_data(self):
         print(__name__, inspect.currentframe().f_code.co_name)
+
+        # Update again here, because self.params['zoneCoord'] object
+        # could have changed since __init__
+        self.zoneCoord = self.params['zoneCoord']
 
         # List of existing zones (some could have been fully deselected)
         self.zones = np.unique(self.zoneCoord)
@@ -235,10 +229,5 @@ class DataProcessing():
         if abs(total_time - selected_time) < 0.5:
             data = data.drop(index='Selected_time', level=0)
 
+        self.data = data  #???
         return data
-
-def save(data, file=r'Trials\Test_pandas_output_2.csv'):
-    print(__name__, inspect.currentframe().f_code.co_name)
-
-    with open(file, 'w+', newline='') as output:
-        data.to_csv(output, sep=';', decimal='.')

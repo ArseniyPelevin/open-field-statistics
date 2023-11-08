@@ -1,7 +1,9 @@
-import pandas as pd
 import json
 import os
 import inspect
+import copy
+import numpy as np
+import pandas as pd
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFileDialog, QToolTip,
@@ -24,12 +26,11 @@ from PyQt6.QtGui import (
 from superqt import QRangeSlider
 
 class File:
-    def __init__(self, window, settings):
+    def __init__(self, window):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.window = window
-        self.settings = settings
-        self.params = self.window.params  #FIXME it shouldn't be here
+        self.params = self.window.params
 
         self.dataFilters = '''CSV (comma delimited) (*.csv);;
                               Text (tab delimited) (*.txt);;
@@ -58,7 +59,7 @@ class File:
         fileMenu = menu.addMenu('File')
 
         files = ['loadData', 'loadParams', 'saveData', 'saveParams', 'saveMap']
-        items = ['caption', 'action', 'slot', 'file']
+        items = ['caption', 'action', 'slot']
         self.fileItems = pd.DataFrame(index=files, columns=items)
         self.fileItems.loc[:, ['caption', 'slot']] = [
             ['Load raw data', self.loadData],
@@ -80,48 +81,49 @@ class File:
             # Add actions to fileMenu
             fileMenu.addAction(self.fileItems.loc[file, 'action'])
 
+        fileMenu.insertSeparator(self.fileItems.loc['saveData', 'action'])
+
         # Do not allow to save output data before raw data were loaded
         self.fileItems.loc['saveData', 'action'].setDisabled(True)
-        self.fileItems.loc['saveMap', 'action'].setDisabled(True) #TODO
-
+        self.fileItems.loc['saveMap', 'action'].setDisabled(True)
 
     def loadData(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
         ''' Load raw data file, get statistics, update map and table '''
 
-        loadDataFile, filter = QFileDialog.getOpenFileName(
+        # Make raw data file's name an atribute
+        # to suggest name for output statistics file
+        self.loadDataFile, filter = QFileDialog.getOpenFileName(
             parent=self.window,
             caption=self.fileItems.loc['loadData', 'caption'],
-            directory=self.settings['dirs']['loadData'],
-            filter=self.dataFilters,
-            initialFilter=self.dataFilters)
+            directory=self.params['dirs']['loadData'],
+            filter=self.dataFilters
+            )
 
-        # Read pandas dataframe from file and preprocess it
-        if loadDataFile:
-            maxX, maxY = self.window.stat.read(loadDataFile)
-            # Check if data correspond to field settings
-            if maxX or maxY:
-                self.incorrectData(maxX, maxY)
-                return
-        else:  # File dialog exited with Cancel
+        # FileDialog was exited with cancel
+        if not self.loadDataFile:
             return
 
-#??? Call other modules through window here?
-        # Update time variables based on loaded data
-        self.window.time.loadTimeVariables(self.window.stat)
+        self.raw_df = pd.read_csv(
+            self.loadDataFile,
+            sep=None,   # Uses 'csv.Sniffer' for decimal separator,
+            # needs python engine
+            engine='python',
+            # engine='c',  # Needs specified decimal separator
+            parse_dates=[0], date_format='%H:%M:%S.%f',
+            names=['time', 'x1', 'x2', 'y1', 'y2', 'z'], header=0,
+            index_col=0
+            )
 
-        # Get statistics and fill the table
-        self.window.table.fillTable()
-
-        # Update path on map
-        self.window.map.updateMapPath(self.params['startSelected'],
-                                      self.params['endSelected'])
+        # Data are incompatible to current parameters
+        if not self.updateData():
+            return
 
         # Set file name label
         metrix = QFontMetrics(self.fileNameLabel.font())
         width = self.fileNameLabel.width() - 2;
-        clippedText = metrix.elidedText(loadDataFile, Qt.ElideMiddle, width)
+        clippedText = metrix.elidedText(self.loadDataFile, Qt.ElideMiddle, width)
         self.fileNameLabel.setText(clippedText)
 
         # After raw data were loaded, allow saving output data
@@ -129,8 +131,28 @@ class File:
         # self.fileItems.loc['saveMap', 'action'].setEnabled(True) #TODO
         self.saveDataButton.setEnabled(True)
 
-        # Save raw data file's name to suggest name for output statistics file
-        self.fileItems.loc['loadData', 'file'] = loadDataFile
+    def updateData(self):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
+        if hasattr(self, 'loadDataFile'):
+            maxX, maxY = self.window.stat.read(self.raw_df) #??? attr here?
+            # Check if data correspond to field settings
+            if maxX or maxY:
+                self.incorrectData(maxX, maxY)
+                return False
+
+            # Update time variables based on loaded data
+            self.window.time.loadTimeVariables(self.window.stat)
+
+            # Update path on map
+            self.window.map.updateMapPath(self.params['startSelected'],
+                                          self.params['endSelected'])
+
+        # Get statistics and fill the table
+        self.window.table.fillTable()
+
+        # Confirm to sender (loadData or loadParams) that data are correct
+        return True
 
     def incorrectData(self, maxX, maxY):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -151,57 +173,79 @@ class File:
 
         QMessageBox.warning(self.window, 'Incorrect raw data', warningMessage)
 
-        self.window.stat.has_file = False
-
-    def loadParams(self):
+    def loadParams(self, loadParamsFile=None):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        self.fileItems.loc['loadParams', 'file'], _filter = (
-            QFileDialog.getOpenFileName(
+        # Called to open FileDialog, not to load recentSettings
+        if not loadParamsFile:
+            loadParamsFile, _filter = QFileDialog.getOpenFileName(
                 parent=self.window,
                 caption=self.fileItems.loc['loadParams', 'caption'],
-                directory=self.settings['dirs']['params'],
-                filter='JSON (*json)',
-                initialFilter='JSON (*json)')
-            )
+                directory=self.params['dirs']['params'],
+                filter='JSON (*.json)'
+                )
 
+        # FileDialog was exited with cancel
+        if not loadParamsFile:
+            return
 
+        with open(loadParamsFile, 'r', newline='') as file:
+            params = json.load(file)
 
-    def saveData(self, data):
+        params['zoneCoord'] = np.array(params['zoneCoord'])
+
+        self.params.update(params)
+
+        self.window.map.deleteMap()
+        self.window.map.loadMap()
+
+        self.updateData()
+
+    def saveData(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
+        # Take loadDataFile's name and drop file extension
+        self.loadDataFileName = os.path.splitext(self.loadDataFile)[0]
         path = os.path.join(
-            self.settings['dirs']['saveData'],
-            f"{self.fileItems.loc['loadData', 'file']}_statiistics") # .csv #???
-        self.outputDataFile, filter = QFileDialog.getSaveFileName(
+            self.params['dirs']['saveData'],
+            f"{self.loadDataFileName}_statistics")
+
+        saveDataFile, filter = QFileDialog.getSaveFileName(
             parent=self.window,
             caption=self.fileItems.loc['saveData', 'caption'],
             directory=path,
-            filter=self.dataFilters,
-            initialFilter=self.dataFilters)
+            filter=self.dataFilters
+            )
 
+        # FileDialog was exited with cancel
+        if not saveDataFile:
+            return
 
-        # with open(self.outputFile, 'w+', newline='') as output:
+        with open(saveDataFile, 'w+', newline='') as file:
+            self.window.stat.data.to_csv(file, sep=';', decimal='.')
 
-        # with open(file, 'w+', newline='') as output:
-        #     data.to_csv(output, sep=';', decimal='.')
-
-    def saveParams(self, params):
+    def saveParams(self, saveParamsFile=None):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        if self.fileItems.loc['loadParams', 'file']:
-            path = os.path.join(
-                self.settings['dirs']['params'],
-                f"{self.fileItems.loc['loadParams', 'file']}")
-        else:
-            path = self.settings['dirs']['params']
+        # File was not provided by sender
+        # (as if called from Settings.saveRecentSettings)
+        if not saveParamsFile:
+            saveParamsFile, _filter = QFileDialog.getSaveFileName(
+                parent=self.window,
+                caption=self.fileItems.loc['saveParams', 'caption'],
+                directory=self.params['dirs']['params'],
+                filter='JSON (*.json)'
+                )
+            # FileDialog was exited with cancel
+            if not saveParamsFile:
+                return
 
-        self.fileItems.loc['loadParams', 'file'], _filter = QFileDialog.getSaveFileName(
-            parent=self.window,
-            caption=self.fileItems.loc['loadParams', 'caption'],
-            directory=path,
-            filter='JSON (*json)',
-            initialFilter='JSON (*json)')
+        params = copy.deepcopy(self.params)
+        # print(params['zoneCoord'])
+        params['zoneCoord'] = params['zoneCoord'].tolist()
 
-    def saveMap(self, map):
+        with open(saveParamsFile, 'w+', newline='') as file:
+            json.dump(params, file, indent='\t')
+
+    def saveMap(self):
         pass  #TODO

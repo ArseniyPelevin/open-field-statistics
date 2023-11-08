@@ -1,8 +1,9 @@
-import pandas as pd
 import json
 import os
 import copy
 import inspect
+import numpy as np
+import pandas as pd
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFileDialog, QToolTip,
@@ -29,7 +30,6 @@ ALL_STAT_PARAMS = ['time', 'dist', 'velocity', 'rearing_n', 'rearing_time']
 DEFAULT_SETTINGS = {
     # File parameters:
     'dirs': {folder: None for folder in DEFAULT_FOLDER_TYPES},
-    'files': {},
 
     # Field parameters:
     'numLasersX': 16,
@@ -64,39 +64,54 @@ class Settings():
     def loadRecentSettings(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        if r'recent_settings.json' in os.listdir('temp'):
-            folder = os.path.join('temp', 'recent_settings.json')
-            with open(folder, 'r', newline='') as file:
-                self.settings = json.load(file)
+        if 'recent_settings.json' in os.listdir('temp'):
+            path = os.path.join('temp', 'recent_settings.json')
+            with open(path, 'r', newline='') as file:
+                recentSettings = json.load(file)
         else:
-            self.settings = DEFAULT_SETTINGS
+            recentSettings = DEFAULT_SETTINGS
 
-        self.window.params.update(self.settings)
+        recentSettings['zoneCoord'] = np.zeros((recentSettings['numLasersY'],
+                                                recentSettings['numLasersX']),
+                                               dtype=int)
 
-    def saveRecentParameters(self):
+        self.window.params.update(recentSettings)
+
+    def saveRecentSettings(self, newRecentSettings):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        folder = os.path.join('temp', 'recent_settings.json')
-        with open(folder, 'w+', newline='') as file:
-            json.dump(self.settings, file, indent='\t')
+        path = os.path.join('temp', 'recent_settings.json')
+        self.window.file.saveParams(path)
+        self.window.file.loadParams(path)
 
     def openSettingsDialog(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        settingsDialog = self.SettingsDialog(self.window, self.settings)
-        newSettings = settingsDialog.show()
+        self.settingsDialog = self.SettingsDialog(self.window)
+        newSettings = self.settingsDialog.show()
         if newSettings:
-            self.settings = newSettings
-            self.window.params.update(self.settings)
-            self.saveRecentParameters()
+            newSettings = self.clearZoneCoord(newSettings)
+            self.window.params.update(newSettings)
+            self.saveRecentSettings(newSettings)
+
+    def clearZoneCoord(self, settings):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
+        ''' If numLasers parameter was changed - reset zoneCoord '''
+
+        settings['zoneCoord'] = np.zeros((
+            settings['numLasersY'],
+            settings['numLasersX']), dtype=int)
+
+        return settings
 
     class SettingsDialog(QDialog):
-        def __init__(self, window, settings):
+        def __init__(self, window):
             print(__name__, inspect.currentframe().f_code.co_name)
 
             super().__init__(window)
 
-            self.tempSettings = copy.deepcopy(settings)
+            self.tempSettings = copy.deepcopy(window.params)
 
             self.setWindowTitle('Settings')
 
