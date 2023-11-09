@@ -4,11 +4,12 @@ import inspect
 
 
 class DataProcessing():
-    def __init__(self, params):
+    def __init__(self, window):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        self.params = params
-        self.zoneCoord = self.params['zoneCoord']
+        self.params = window.settings.params
+        self.zoneCoord = window.map.zoneCoord
+        self.timeParams = window.time.timeParams
 
         self.has_file = False
         self.zones = np.array([])
@@ -128,7 +129,7 @@ class DataProcessing():
 
         # Update again here, because self.params['zoneCoord'] object
         # could have changed since __init__
-        self.zoneCoord = self.params['zoneCoord']
+        # self.zoneCoord = self.params['zoneCoord'] #!!!
 
         # List of existing zones (some could have been fully deselected)
         self.zones = np.unique(self.zoneCoord)
@@ -138,9 +139,9 @@ class DataProcessing():
         if not self.has_file:
             return self.make_dummy_data()
 
-        start = self.params['startSelected']
-        end = self.params['endSelected']
-        period = self.params['period']
+        start = self.timeParams['startSelected']
+        end = self.timeParams['endSelected']
+        period = self.timeParams['period']
 
 #TODO mention this behavior in documentation
         # Make periods' index in the format 'period_start—period_end'

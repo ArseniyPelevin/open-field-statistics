@@ -34,7 +34,7 @@ class TableModel(QtCore.QAbstractTableModel):
     def data(self, index, role):
         # print(__name__, inspect.currentframe().f_code.co_name)
 
-        numStatParam = len(self.window.params['statParams'])
+        numStatParam = len(self.window.settings.params['statParams'])
 
         if role == Qt.DisplayRole:
             value = self._data.iloc[index.row(), index.column()]

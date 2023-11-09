@@ -39,13 +39,12 @@ class MainWindow(QMainWindow):
 
         # self.setVariables()
 
-        self.params = {}
-        self.file = File(self)
         self.settings = Settings(self)
+        self.file = File(self)
         self.map = MapWidget(self)
         # self.map.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.time = TimeParameters(self)
-        self.stat = DataProcessing(self.params)#, self.map.zoneCoord)
+        self.stat = DataProcessing(self)
         self.table = TableView(self, app)
 
         self.setMenu()
@@ -107,10 +106,10 @@ class MainWindow(QMainWindow):
         container.setLayout(self.generalLayout)
         self.setCentralWidget(container)
 
-    # def closeEvent(self, event):
-    #     print(__name__, inspect.currentframe().f_code.co_name)
+    def closeEvent(self, event):
+        print(__name__, inspect.currentframe().f_code.co_name)
 
-    #     self.settings.saveRecentSettings()
+        self.settings.saveRecentSettings()
 
     # def resizeEvent(self, e):
     #     # try:

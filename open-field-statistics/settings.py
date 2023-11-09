@@ -56,7 +56,7 @@ class Settings():
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.window = window
-        self.loadRecentSettings()
+        self.params = self.loadRecentSettings()
 
 #TODO QTabBar ?
 #https://doc.qt.io/qt-5/qtabwidget.html
@@ -71,53 +71,60 @@ class Settings():
         else:
             recentSettings = DEFAULT_SETTINGS
 
-        recentSettings['zoneCoord'] = np.zeros((recentSettings['numLasersY'],
-                                                recentSettings['numLasersX']),
-                                               dtype=int)
+        return recentSettings
 
-        self.window.params.update(recentSettings)
-
-    def saveRecentSettings(self, newRecentSettings):
-        print(__name__, inspect.currentframe().f_code.co_name)
-
-        path = os.path.join('temp', 'recent_settings.json')
-        self.window.file.saveParams(path)
-        self.window.file.loadParams(path)
+        # self.window.params.update(recentSettings)  #!!!
 
     def openSettingsDialog(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        self.settingsDialog = self.SettingsDialog(self.window)
+        self.settingsDialog = self.SettingsDialog(self.window, self.params)
         newSettings = self.settingsDialog.show()
         if newSettings:
-            newSettings = self.clearZoneCoord(newSettings)
-            self.window.params.update(newSettings)
-            self.saveRecentSettings(newSettings)
+            self.params.update(newSettings)
+            if self.settingsDialog.fieldParameterChanged:
+                self.clearZoneCoord()
+            self.window.file.updateData()
+            self.saveRecentSettings()
 
-    def clearZoneCoord(self, settings):
+    def clearZoneCoord(self):  #???
         print(__name__, inspect.currentframe().f_code.co_name)
 
         ''' If numLasers parameter was changed - reset zoneCoord '''
 
-        settings['zoneCoord'] = np.zeros((
-            settings['numLasersY'],
-            settings['numLasersX']), dtype=int)
+        # Change size of zoneCoord and fill it with zeros in-place
+        self.window.map.zoneCoord.resize((self.params['numLasersY'],
+                                          self.params['numLasersX']),
+                                         refcheck=False)
+        self.window.map.zoneCoord[:, :] = np.zeros((self.params['numLasersY'],
+                                                    self.params['numLasersX']),
+                                                   dtype=int)
+        self.window.map.deleteMap()
+        self.window.map.loadMap()
 
-        return settings
+    def saveRecentSettings(self):
+        print(__name__, inspect.currentframe().f_code.co_name)
+
+        path = os.path.join('temp', 'recent_settings.json')
+        with open(path, 'w+', newline='') as file:
+            json.dump(self.params, file)
+
 
     class SettingsDialog(QDialog):
-        def __init__(self, window):
+        def __init__(self, window, settings):
             print(__name__, inspect.currentframe().f_code.co_name)
 
             super().__init__(window)
 
-            self.tempSettings = copy.deepcopy(window.params)
+            # self.tempSettings = copy.deepcopy(window.params)  #!!!
+            self.tempSettings = copy.deepcopy(settings)
+
+            self.fieldParameterChanged = False
 
             self.setWindowTitle('Settings')
 
             dialogButtons = QDialogButtonBox.Save | QDialogButtonBox.Cancel
             self.buttonBox = QDialogButtonBox(dialogButtons)
-
             self.buttonBox.accepted.connect(self.accept)
             self.buttonBox.rejected.connect(self.reject)
 
@@ -135,6 +142,8 @@ class Settings():
 
             if self.exec():
                 return copy.deepcopy(self.tempSettings)
+            else:
+                self.fieldParameterChanged = False
 
         def createFileGroup(self):
             print(__name__, inspect.currentframe().f_code.co_name)
@@ -236,13 +245,13 @@ class Settings():
             boxSideY.setValue(self.tempSettings['boxSideY'])
 
             numLasersX.valueChanged.connect(lambda val:
-                self.tempSettings.update({'numLasersX': val}))
+                self.updateFieldParameter('numLasersX', val))
             numLasersY.valueChanged.connect(lambda val:
-                self.tempSettings.update({'numLasersY': val}))
+                self.updateFieldParameter('numLasersY', val))
             boxSideX.valueChanged.connect(lambda val:
-                self.tempSettings.update({'boxSideX': val}))
+                self.updateFieldParameter('boxSideX', val))
             boxSideY.valueChanged.connect(lambda val:
-                self.tempSettings.update({'boxSideY': val}))
+                self.updateFieldParameter('boxSideY', val))
 
             fieldParametersGroupLayout.addWidget(numLasersXLabel, 0, 0)
             fieldParametersGroupLayout.addWidget(numLasersX, 0, 1)
@@ -254,6 +263,12 @@ class Settings():
             fieldParametersGroupLayout.addWidget(boxSideY, 3, 1)
 
             return fieldParametersGroup
+
+        def updateFieldParameter(self, parameter, value):
+            print(__name__, inspect.currentframe().f_code.co_name)
+
+            self.tempSettings.update({parameter: value})
+            self.fieldParameterChanged = True
 
         def createStatisticsGroup(self):
             print(__name__, inspect.currentframe().f_code.co_name)

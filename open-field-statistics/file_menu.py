@@ -30,11 +30,11 @@ class File:
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.window = window
-        self.params = self.window.params
+        self.params = self.window.settings.params
 
-        self.dataFilters = '''CSV (comma delimited) (*.csv);;
-                              Text (tab delimited) (*.txt);;
-                              Excel Workbook (*.xlsx)'''
+        self.dataFilters = '''CSV (comma delimited) (*.csv)'''#;;
+                              # Text (tab delimited) (*.txt);;
+                              # Excel Workbook (*.xlsx)'''  #TODO
 
         self.setButtons()
 
@@ -134,7 +134,7 @@ class File:
     def updateData(self):
         print(__name__, inspect.currentframe().f_code.co_name)
 
-        if hasattr(self, 'loadDataFile'):
+        if hasattr(self, 'loadDataFile') and self.loadDataFile:
             maxX, maxY = self.window.stat.read(self.raw_df) #??? attr here?
             # Check if data correspond to field settings
             if maxX or maxY:
@@ -145,8 +145,9 @@ class File:
             self.window.time.loadTimeVariables(self.window.stat)
 
             # Update path on map
-            self.window.map.updateMapPath(self.params['startSelected'],
-                                          self.params['endSelected'])
+            self.window.map.updateMapPath(
+                self.window.time.timeParams['startSelected'],
+                self.window.time.timeParams['endSelected'])
 
         # Get statistics and fill the table
         self.window.table.fillTable()
@@ -192,12 +193,21 @@ class File:
         with open(loadParamsFile, 'r', newline='') as file:
             params = json.load(file)
 
-        params['zoneCoord'] = np.array(params['zoneCoord'])
+        # Update settings
+        self.window.settings.params.update(params['settings'])
 
-        self.params.update(params)
-
+        # Update map
+        self.window.map.zoneCoord.resize((self.params['numLasersY'],
+                                          self.params['numLasersX']),
+                                         refcheck=False)
+        self.window.map.zoneCoord[:, :] = params['zoneCoord']
         self.window.map.deleteMap()
         self.window.map.loadMap()
+
+        # Update time (if data were loaded and correspond to timeParams)
+        if (self.window.stat.has_file and
+           params['timeParams']['endSelected'] <= self.window.time.totalTime):
+            self.window.time.timeParams.update(params['timeParams'])
 
         self.updateData()
 
@@ -222,7 +232,9 @@ class File:
             return
 
         with open(saveDataFile, 'w+', newline='') as file:
-            self.window.stat.data.to_csv(file, sep=';', decimal='.')
+            self.window.stat.data.to_csv(file,
+                                         sep=self.params['separator'],
+                                         decimal=self.params['decimal'])
 
     def saveParams(self, saveParamsFile=None):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -240,9 +252,10 @@ class File:
             if not saveParamsFile:
                 return
 
-        params = copy.deepcopy(self.params)
-        # print(params['zoneCoord'])
-        params['zoneCoord'] = params['zoneCoord'].tolist()
+        params = {}
+        params['settings'] = copy.deepcopy(self.params)
+        params['zoneCoord'] = self.window.map.zoneCoord.tolist()
+        params['timeParams'] = self.window.time.timeParams.copy()
 
         with open(saveParamsFile, 'w+', newline='') as file:
             json.dump(params, file, indent='\t')

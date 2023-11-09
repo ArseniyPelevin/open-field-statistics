@@ -28,6 +28,10 @@ class MapWidget(QLabel):
         super().__init__()
 
         self.window = window
+        self.params = self.window.settings.params
+        self.zoneCoord = np.zeros((self.params['numLasersY'],
+                                   self.params['numLasersX']),
+                                  dtype=int)
 
         self.pathPoints = []  # Will be assigned from __main__ after loading raw data
 
@@ -43,13 +47,13 @@ class MapWidget(QLabel):
 
         ''' Create map and its parameters based on new loaded parameters '''
 
-        self.numLasersX = self.window.params['numLasersX']
-        self.numLasersY = self.window.params['numLasersY']
+        self.numLasersX = self.params['numLasersX']
+        self.numLasersY = self.params['numLasersY']
 
         self.mapSideY = 320 #???
         self.mapSideX = int(self.mapSideY *
-                            self.window.params['boxSideX'] /
-                            self.window.params['boxSideY'])
+                            self.params['boxSideX'] /
+                            self.params['boxSideY'])
 
         # Make MapSide divisible by numLasers
         self.mapSideX -= self.mapSideX % self.numLasersX
@@ -62,7 +66,7 @@ class MapWidget(QLabel):
         # Set map widget's size with a 2 px margin for border line rendering
         self.setFixedSize(self.mapSideX + 2, self.mapSideY + 2)
 
-        self.zoneCoord = self.window.params['zoneCoord']
+        # self.zoneCoord = self.window.params['zoneCoord']  #!!!
         # self.numZones = self.zoneCoord.max()
         zones = np.unique(self.zoneCoord)
         zones = zones[zones > 0]
@@ -102,6 +106,7 @@ class MapWidget(QLabel):
 
         gridPainter.end()
 
+        self.updateMapZones()
         self.updateMap()
 
         self.setStyleSheet(ColorStyle.mapStyleSheet(self.numZones))
@@ -476,7 +481,7 @@ class MapWidget(QLabel):
                 lambda checked, i=s:
                     self.mapBtnToggled(checked=checked, s=i))
 
-
+        print(self.zoneCoord)
 
         return squareMap
 

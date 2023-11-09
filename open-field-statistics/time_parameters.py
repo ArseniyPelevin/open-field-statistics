@@ -28,9 +28,9 @@ class TimeParameters:
         print(__name__, inspect.currentframe().f_code.co_name)
 
         self.window = window
-        self.map = self.window.map
 
-        self.params = self.window.params
+        # self.params = self.window.params #!!!
+        self.timeParams = dict.fromkeys(['startSelected', 'endSelected', 'period'])
         # self.numStatParam = len(self.params['statParams'])
         # self.hasSelectedStat = False
 
@@ -113,13 +113,13 @@ class TimeParameters:
 
         self.totalTime = stat.df.index[-1].total_seconds()
 
-        self.params['startSelected'] = 0
-        self.params['endSelected'] = self.totalTime
+        self.timeParams['startSelected'] = 0
+        self.timeParams['endSelected'] = self.totalTime
 
-        self.selectedTime = round(self.params['endSelected']
-                                  - self.params['startSelected'], 1)
+        self.selectedTime = round(self.timeParams['endSelected']
+                                  - self.timeParams['startSelected'], 1)
 
-        self.params['period'] = self.selectedTime
+        self.timeParams['period'] = self.selectedTime
 
         self.loadTimeWidgets()
 
@@ -129,11 +129,11 @@ class TimeParameters:
         ''' Update time widgets based on loaded raw data '''
 
         self.startSelectedLine.setRange(0., self.totalTime)
-        self.startSelectedLine.setValue(self.params['startSelected'])
+        self.startSelectedLine.setValue(self.timeParams['startSelected'])
         self.endSelectedLine.setRange(0., self.totalTime)
-        self.endSelectedLine.setValue(self.params['endSelected'])
+        self.endSelectedLine.setValue(self.timeParams['endSelected'])
         self.periodLine.setRange(1., self.totalTime)
-        self.periodLine.setValue(self.params['period'])
+        self.periodLine.setValue(self.timeParams['period'])
 
         self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
 
@@ -141,8 +141,8 @@ class TimeParameters:
 
         with QSignalBlocker(self.timeRangeSlider):
             self.timeRangeSlider.setRange(0, self.totalTime / sliderStep)
-            self.timeRangeSlider.setValue([self.params['startSelected'] / sliderStep,
-                                           self.params['endSelected'] / sliderStep])
+            self.timeRangeSlider.setValue([self.timeParams['startSelected'] / sliderStep,
+                                           self.timeParams['endSelected'] / sliderStep])
 
         self.startSelectedLine.setEnabled(True)
         self.endSelectedLine.setEnabled(True)
@@ -169,15 +169,15 @@ class TimeParameters:
         start = self.startSelectedLine.value()
 
         errorMessage = ('Start time should be in the range:\n'
-                        + f"0 s ≤ start time < {self.params['endSelected']} s")
+                        + f"0 s ≤ start time < {self.timeParams['endSelected']} s")
 
         # Selected start > Selected end, back to initial value
-        if start >= self.params['endSelected']:
+        if start >= self.timeParams['endSelected']:
             self.errorWarning(self.startSelectedLine, errorMessage)
-            start = self.params['startSelected']
+            start = self.timeParams['startSelected']
             self.startSelectedLine.setValue(start)
 
-        self.updateSelectedTime(start, self.params['endSelected'])
+        self.updateSelectedTime(start, self.timeParams['endSelected'])
 
     def checkEndSelected(self):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -185,12 +185,12 @@ class TimeParameters:
         end = self.endSelectedLine.value()
 
         errorMessage = ('End time should be in the range:\n'
-                        + f"{self.params['startSelected']} s < end time ≤ {self.totalTime} s")
+                        + f"{self.timeParams['startSelected']} s < end time ≤ {self.totalTime} s")
 
         # Selected end < Selected start, back to previous value
-        if end <= self.params['startSelected']:
+        if end <= self.timeParams['startSelected']:
             self.errorWarning(self.endSelectedLine, errorMessage)
-            end = self.params['endSelected']
+            end = self.timeParams['endSelected']
             self.endSelectedLine.setValue(end)
 
         # # Selected end > total time, set Selected time to max total time #!!!
@@ -199,7 +199,7 @@ class TimeParameters:
         #     end = self.totalTime
         #     self.endSelectedLine.setValue(end)
 
-        self.updateSelectedTime(self.params['startSelected'], end)
+        self.updateSelectedTime(self.timeParams['startSelected'], end)
 
     def errorWarning(self, widget, errorMessage=''):
         print(__name__, inspect.currentframe().f_code.co_name)
@@ -248,7 +248,7 @@ class TimeParameters:
         with QSignalBlocker(self.endSelectedLine):
             self.endSelectedLine.setValue(end)
 
-        self.map.updateMapPath(start, end)
+        self.window.map.updateMapPath(start, end)
         # Do not update SelectedTime values here while slider is being moved
 
     def updateSelectedTime(self, start=None, end=None):
@@ -259,8 +259,8 @@ class TimeParameters:
             start /= 10
             end /= 10
 
-        self.params['startSelected'] = start
-        self.params['endSelected'] = end
+        self.timeParams['startSelected'] = start
+        self.timeParams['endSelected'] = end
 
         # Update slider values based on text editors
         self.timeRangeSlider.setValue([start*10, end*10])
@@ -269,7 +269,7 @@ class TimeParameters:
         self.selectedTime = round(end - start, 1)
         self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
 
-        period = self.params['period']
+        period = self.timeParams['period']
         if (period == oldSelectedTime or period > self.selectedTime):
             period = self.selectedTime
         self.updatePeriod(period)
@@ -283,7 +283,7 @@ class TimeParameters:
         '''
 
         self.periodLine.setValue(period)
-        self.params['period'] = period
+        self.timeParams['period'] = period
 
         self.window.table.fillTable()
 
