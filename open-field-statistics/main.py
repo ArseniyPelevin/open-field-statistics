@@ -1,18 +1,13 @@
-#!/usr/bin/env python3
-
 import os
-import sys
-import pandas as pd
 import inspect
 
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QStyleFactory, QFileDialog,
-    QWidget, QLabel, QPushButton,
+    QApplication, QMainWindow, QStyleFactory,
     QVBoxLayout, QHBoxLayout, QGridLayout, QSpacerItem,
-    QMessageBox
+    QWidget
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFontMetrics, QIcon, QAction
+from PyQt6.QtGui import QIcon, QAction
 
 from superqt import QRangeSlider
 
@@ -26,10 +21,13 @@ from app_info import Info
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+    def __init__(self, app):
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         super().__init__()
+
+        self.app = app  #???
+
         self.setWindowTitle('Open Field Statistics')
         self.setWindowIcon(QIcon('logo.ico'))
 
@@ -54,7 +52,7 @@ class MainWindow(QMainWindow):
         # self.mapSide = min(self.height(), self.width()/2) * 2/3
 
     def setMenu(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         menu = self.menuBar()
 
@@ -70,9 +68,8 @@ class MainWindow(QMainWindow):
         menu.addAction(infoAction)
 
     def setLayouts(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
-#FIXME It is potentially source of bugs with new settings!!!
         self.controlLayout = QGridLayout()
         self.controlLayout.addWidget(self.file.loadFileButton, 0, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.file.fileNameLabel, 0, 1, 1, 2)
@@ -82,9 +79,7 @@ class MainWindow(QMainWindow):
         self.controlLayout.addLayout(self.map.areaBtnLayout, 2, 0, 1, 1, Qt.AlignLeft)
         self.controlLayout.addWidget(self.map, 2, 1, 1, 1, Qt.AlignLeft)
 
-        self.controlLayout.addLayout(self.time.periodLayout, 4, 0, 1, 2,
-                                     (Qt.AlignRight | Qt.AlignBottom))
-        self.controlLayout.addLayout(self.time.timeRangeLayout, 5, 0, 1, 2, Qt.AlignBottom)
+        self.controlLayout.addWidget(self.time.timeGroup, 4, 0, 1, 2, Qt.AlignBottom)
 
         # Add spacers
         self.controlLayout.addItem(QSpacerItem(0, 0), 0, 2, 5, 1)
@@ -107,7 +102,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
     def closeEvent(self, event):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.settings.saveRecentSettings()
 
@@ -129,6 +124,6 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     app = QApplication(os.sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
-    window = MainWindow()
+    window = MainWindow(app)
     window.show()
     app.exec()

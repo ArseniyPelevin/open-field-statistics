@@ -1,23 +1,12 @@
 import numpy as np
-import math as m
 import inspect
 
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QFileDialog, QToolTip,
-    QLabel, QLineEdit, QPushButton, QButtonGroup, QSpacerItem,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
-    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStyleFactory,
-    QDoubleSpinBox, QAbstractSpinBox
+    QDoubleSpinBox, QAbstractSpinBox, QLabel, QToolTip,
+    QGroupBox, QHBoxLayout, QGridLayout,
 )
-from PyQt6.QtCore import (
-    Qt, QSize, pyqtSlot, QEvent, QPointF, QVariantAnimation, QRegularExpression,
-    QSignalBlocker
-    )
-from PyQt6.QtGui import (
-    QFontMetrics, QIcon,
-    QPen, QPixmap, QPainter, QColor, QPalette, QRegularExpressionValidator
-)
+from PyQt6.QtCore import Qt, QVariantAnimation, QSignalBlocker
+from PyQt6.QtGui import QColor, QPalette
 
 from superqt import QRangeSlider
 
@@ -25,21 +14,19 @@ from superqt import QRangeSlider
 class TimeParameters:
 
     def __init__(self, window):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.window = window
 
-        # self.params = self.window.params #!!!
-        self.timeParams = dict.fromkeys(['startSelected', 'endSelected', 'period'])
-        # self.numStatParam = len(self.params['statParams'])
-        # self.hasSelectedStat = False
+        self.timeParams = dict.fromkeys(['startSelected', 'endSelected', 'period'], 0)
+        self.totalTime = 0
 
         self.setTimeWidgets()
         self.setTimeSignals()
         self.setTimeLayouts()
 
     def setTimeWidgets(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.periodLabel = QLabel('Time period every ')
 
@@ -50,7 +37,6 @@ class TimeParameters:
         self.periodLine.setButtonSymbols(QAbstractSpinBox.NoButtons)
         self.periodLine.setCorrectionMode('max')
         self.periodLine.setKeyboardTracking(False)
-        self.periodLine.setDisabled(True)
 
         self.startSelectedLine = DoubleSpinBox(alignment=Qt.AlignLeft)
         self.startSelectedLine.setFixedWidth(60)
@@ -59,7 +45,6 @@ class TimeParameters:
         self.startSelectedLine.setButtonSymbols(QAbstractSpinBox.NoButtons)
         self.startSelectedLine.setCorrectionMode('min')
         self.startSelectedLine.setKeyboardTracking(False)
-        self.startSelectedLine.setDisabled(True)
 
         self.endSelectedLine = DoubleSpinBox(alignment=Qt.AlignRight)
         self.endSelectedLine.setFixedWidth(60)
@@ -68,10 +53,8 @@ class TimeParameters:
         self.endSelectedLine.setButtonSymbols(QAbstractSpinBox.NoButtons)
         self.endSelectedLine.setCorrectionMode('max')
         self.endSelectedLine.setKeyboardTracking(False)
-        self.endSelectedLine.setDisabled(True)
 
         self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
-        self.timeRangeSlider.setDisabled(True)
 
         self.selectedTimeLabel = QLabel()
 
@@ -80,21 +63,24 @@ class TimeParameters:
                                          QPalette.Active, QPalette.Base)
 
     def setTimeSignals(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         # Update period
-        self.periodLine.valueChanged.connect(self.checkPeriod)
+        self.periodLine.editingFinished.connect(self.checkPeriod)
 
         # Update time range from text
-        self.startSelectedLine.valueChanged.connect(self.checkStartSelected)
-        self.endSelectedLine.valueChanged.connect(self.checkEndSelected)
+        self.startSelectedLine.editingFinished.connect(self.checkStartSelected)
+        self.endSelectedLine.editingFinished.connect(self.checkEndSelected)
 
         # Update time range from slider
         self.timeRangeSlider.sliderMoved.connect(self.sliderUpdateSelectedTime)
         self.timeRangeSlider.sliderReleased.connect(self.updateSelectedTime)
 
     def setTimeLayouts(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
+
+        self.timeGroup = QGroupBox()
+        self.timeLayout = QGridLayout(self.timeGroup)
 
         self.timeRangeLayout = QGridLayout()
         self.timeRangeLayout.addWidget(self.startSelectedLine, 0, 0, Qt.AlignLeft)
@@ -106,8 +92,14 @@ class TimeParameters:
         self.periodLayout.addWidget(self.periodLabel, alignment=Qt.AlignRight)
         self.periodLayout.addWidget(self.periodLine, alignment=Qt.AlignRight)
 
+        self.timeLayout.addLayout(self.periodLayout, 0, 0, 1, 2,
+                                     (Qt.AlignRight | Qt.AlignBottom))
+        self.timeLayout.addLayout(self.timeRangeLayout, 1, 0, 1, 2, Qt.AlignBottom)
+
+        self.timeGroup.setDisabled(True)
+
     def loadTimeVariables(self, stat):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Update time variables based on loaded raw data '''
 
@@ -116,15 +108,14 @@ class TimeParameters:
         self.timeParams['startSelected'] = 0
         self.timeParams['endSelected'] = self.totalTime
 
-        self.selectedTime = round(self.timeParams['endSelected']
-                                  - self.timeParams['startSelected'], 1)
+        self.selectedTime = self.totalTime
 
         self.timeParams['period'] = self.selectedTime
 
         self.loadTimeWidgets()
 
     def loadTimeWidgets(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Update time widgets based on loaded raw data '''
 
@@ -135,6 +126,8 @@ class TimeParameters:
         self.periodLine.setRange(1., self.totalTime)
         self.periodLine.setValue(self.timeParams['period'])
 
+        self.selectedTime = round(self.timeParams['endSelected']
+                                  - self.timeParams['startSelected'], 1)
         self.selectedTimeLabel.setText(f'Selected time: {self.selectedTime} seconds')
 
         sliderStep = 0.1   # Step of selected time range slider in seconds
@@ -144,13 +137,27 @@ class TimeParameters:
             self.timeRangeSlider.setValue([self.timeParams['startSelected'] / sliderStep,
                                            self.timeParams['endSelected'] / sliderStep])
 
-        self.startSelectedLine.setEnabled(True)
-        self.endSelectedLine.setEnabled(True)
-        self.periodLine.setEnabled(True)
-        self.timeRangeSlider.setEnabled(True)
+        self.timeGroup.setEnabled(True)
+
+    def deleteTime(self):
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
+
+        self.timeParams.update({key: 0 for key in self.timeParams})
+
+        self.startSelectedLine.setValue(self.timeParams['startSelected'])
+        self.endSelectedLine.setValue(self.timeParams['endSelected'])
+        self.periodLine.setValue(self.timeParams['period'])
+
+        self.selectedTimeLabel.setText('')
+
+        with QSignalBlocker(self.timeRangeSlider):
+            self.timeRangeSlider.setValue([self.timeRangeSlider.minimum(),
+                                           self.timeRangeSlider.maximum()])
+
+        self.timeGroup.setDisabled(True)
 
     def checkPeriod(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         period = self.periodLine.value()
 
@@ -164,7 +171,7 @@ class TimeParameters:
         self.updatePeriod(period)
 
     def checkStartSelected(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         start = self.startSelectedLine.value()
 
@@ -180,7 +187,7 @@ class TimeParameters:
         self.updateSelectedTime(start, self.timeParams['endSelected'])
 
     def checkEndSelected(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         end = self.endSelectedLine.value()
 
@@ -193,16 +200,10 @@ class TimeParameters:
             end = self.timeParams['endSelected']
             self.endSelectedLine.setValue(end)
 
-        # # Selected end > total time, set Selected time to max total time #!!!
-        # elif end > self.totalTime:
-        #     self.errorWarning(self.endSelectedLine, errorMessage)
-        #     end = self.totalTime
-        #     self.endSelectedLine.setValue(end)
-
         self.updateSelectedTime(self.timeParams['startSelected'], end)
 
     def errorWarning(self, widget, errorMessage=''):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Flash red in the field with an error '''
 
@@ -236,7 +237,7 @@ class TimeParameters:
         QToolTip.showText(self.window.mapToGlobal(widget.pos()), errorMessage, widget)
 
     def sliderUpdateSelectedTime(self, value):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Update path while Selected time slider is being moved '''
 
@@ -252,7 +253,7 @@ class TimeParameters:
         # Do not update SelectedTime values here while slider is being moved
 
     def updateSelectedTime(self, start=None, end=None):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         if start is None or end is None:
             start, end = self.timeRangeSlider.sliderPosition()
@@ -275,7 +276,7 @@ class TimeParameters:
         self.updatePeriod(period)
 
     def updatePeriod(self, period):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name, inspect.currentframe().f_back.f_code.co_name)
 
         '''
         Selected time is split to periods of user-defined length in seconds.

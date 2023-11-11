@@ -1,29 +1,19 @@
-import json
 import os
 import copy
+import json
 import inspect
-import numpy as np
 import pandas as pd
 
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QFileDialog, QToolTip,
-    QLabel, QLineEdit, QPushButton, QButtonGroup, QSpacerItem,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
-    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStyleFactory,
-    QDialog, QDialogButtonBox,
+    QDialog, QFileDialog, QDialogButtonBox,
+    QLabel, QLineEdit, QPushButton,
+    QVBoxLayout, QGridLayout,
     QGroupBox, QCheckBox, QSpinBox, QDoubleSpinBox, QComboBox
 )
-from PyQt6.QtCore import (
-    Qt, QSize, pyqtSlot, QEvent, QPointF, QVariantAnimation, QRegularExpression, QDir
-    )
-from PyQt6.QtGui import (
-    QFontMetrics, QIcon,
-    QPen, QPixmap, QPainter, QColor, QPalette,
-    QRegularExpressionValidator, QIntValidator, QDoubleValidator, QKeySequence
-)
+from PyQt6.QtGui import QKeySequence
 
 from superqt import QRangeSlider
+
 
 DEFAULT_FOLDER_TYPES = ['loadData', 'params', 'saveData', 'saveMap']
 ALL_STAT_PARAMS = ['time', 'dist', 'velocity', 'rearing_n', 'rearing_time']
@@ -41,7 +31,7 @@ DEFAULT_SETTINGS = {
     'statParams': ALL_STAT_PARAMS,
 
     # Sampling parameters
-    'samplingFrequency': 0.1,
+    'samplingFrequency': 0.1,  #???
     'startTime': 1,  # First beam break
 
     # Output parameters:
@@ -50,10 +40,9 @@ DEFAULT_SETTINGS = {
     }
 
 
-
 class Settings():
     def __init__(self, window):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.window = window
         self.params = self.loadRecentSettings()
@@ -62,7 +51,7 @@ class Settings():
 #https://doc.qt.io/qt-5/qtabwidget.html
 
     def loadRecentSettings(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         if 'recent_settings.json' in os.listdir('temp'):
             path = os.path.join('temp', 'recent_settings.json')
@@ -73,37 +62,22 @@ class Settings():
 
         return recentSettings
 
-        # self.window.params.update(recentSettings)  #!!!
-
     def openSettingsDialog(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.settingsDialog = self.SettingsDialog(self.window, self.params)
         newSettings = self.settingsDialog.show()
         if newSettings:
             self.params.update(newSettings)
             if self.settingsDialog.fieldParameterChanged:
-                self.clearZoneCoord()
-            self.window.file.updateData()
+                self.window.file.deleteData()
+                self.window.file.hasDataFile = False
+                self.window.map.loadMap()
+            self.window.table.fillTable()
             self.saveRecentSettings()
 
-    def clearZoneCoord(self):  #???
-        print(__name__, inspect.currentframe().f_code.co_name)
-
-        ''' If numLasers parameter was changed - reset zoneCoord '''
-
-        # Change size of zoneCoord and fill it with zeros in-place
-        self.window.map.zoneCoord.resize((self.params['numLasersY'],
-                                          self.params['numLasersX']),
-                                         refcheck=False)
-        self.window.map.zoneCoord[:, :] = np.zeros((self.params['numLasersY'],
-                                                    self.params['numLasersX']),
-                                                   dtype=int)
-        self.window.map.deleteMap()
-        self.window.map.loadMap()
-
     def saveRecentSettings(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         path = os.path.join('temp', 'recent_settings.json')
         with open(path, 'w+', newline='') as file:
@@ -112,11 +86,10 @@ class Settings():
 
     class SettingsDialog(QDialog):
         def __init__(self, window, settings):
-            print(__name__, inspect.currentframe().f_code.co_name)
+            print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
             super().__init__(window)
 
-            # self.tempSettings = copy.deepcopy(window.params)  #!!!
             self.tempSettings = copy.deepcopy(settings)
 
             self.fieldParameterChanged = False
@@ -132,13 +105,13 @@ class Settings():
             self.layout.addWidget(self.createFileGroup())
             self.layout.addWidget(self.createFieldParametersGroup())
             self.layout.addWidget(self.createStatisticsGroup())
-            self.layout.addWidget(self.createSamplingGroup())
+            self.layout.addWidget(self.createSamplingGroup())  #???
             self.layout.addWidget(self.createOutputFormatGroup())
 
             self.layout.addWidget(self.buttonBox)
 
         def show(self):
-            print(__name__, inspect.currentframe().f_code.co_name)
+            print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
             if self.exec():
                 return copy.deepcopy(self.tempSettings)
@@ -146,7 +119,7 @@ class Settings():
                 self.fieldParameterChanged = False
 
         def createFileGroup(self):
-            print(__name__, inspect.currentframe().f_code.co_name)
+            print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
             fileGroup = QGroupBox('Default files locations')
             fileGroupLayout = QGridLayout(fileGroup)
@@ -200,7 +173,7 @@ class Settings():
             return fileGroup
 
         def selectFolder(self, folder):
-            print(__name__, inspect.currentframe().f_code.co_name)
+            print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
             folderName = self.folderItems.loc[folder, 'dialog'].getExistingDirectory(
                 parent=self,
@@ -214,7 +187,7 @@ class Settings():
 
 
         def createFieldParametersGroup(self):
-            print(__name__, inspect.currentframe().f_code.co_name)
+            print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
             fieldParametersGroup = QGroupBox('Field parameters')
             fieldParametersGroupLayout = QGridLayout(fieldParametersGroup)
@@ -265,13 +238,13 @@ class Settings():
             return fieldParametersGroup
 
         def updateFieldParameter(self, parameter, value):
-            print(__name__, inspect.currentframe().f_code.co_name)
+            print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
             self.tempSettings.update({parameter: value})
             self.fieldParameterChanged = True
 
         def createStatisticsGroup(self):
-            print(__name__, inspect.currentframe().f_code.co_name)
+            print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
             statisticsGroup = QGroupBox('Output statistics')
             statisticsGroupLayout = QVBoxLayout(statisticsGroup)
@@ -311,8 +284,9 @@ class Settings():
 
             return statisticsGroup
 
+        #FIXME Delete it all?
         def createSamplingGroup(self):
-            print(__name__, inspect.currentframe().f_code.co_name)
+            print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
             samplingGroup = QGroupBox('Sampling parameters')
             samplingGroupLayout = QGridLayout(samplingGroup)
@@ -341,8 +315,9 @@ class Settings():
 
             return samplingGroup
 
+        #??? Just trust some locale?
         def createOutputFormatGroup(self):
-            print(__name__, inspect.currentframe().f_code.co_name)
+            print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
             outputFormatGroup = QGroupBox('Output format')
             outputFormatGroupLayout = QGridLayout(outputFormatGroup)

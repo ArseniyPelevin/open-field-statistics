@@ -1,12 +1,12 @@
-import inspect
 import os
+import inspect
 import numpy as np
 import pandas as pd
 
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QPushButton, QButtonGroup,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
-    QTableWidgetItem, QRubberBand
+    QWidget, QLabel, QPushButton,
+    QButtonGroup, QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
+    QRubberBand
 )
 from PyQt6.QtCore import (
     Qt, pyqtSlot, QPoint, QPointF, QRect, QLineF, QSignalBlocker
@@ -23,7 +23,7 @@ from color_style import ColorStyle
 
 class MapWidget(QLabel):
     def __init__(self, window):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         super().__init__()
 
@@ -43,14 +43,14 @@ class MapWidget(QLabel):
         self.rubberBand = QRubberBand(QRubberBand.Shape.Rectangle, self)
 
     def loadMap(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Create map and its parameters based on new loaded parameters '''
 
         self.numLasersX = self.params['numLasersX']
         self.numLasersY = self.params['numLasersY']
 
-        self.mapSideY = 320 #???
+        self.mapSideY = 320 #TODO:??? Make it depend on window size
         self.mapSideX = int(self.mapSideY *
                             self.params['boxSideX'] /
                             self.params['boxSideY'])
@@ -66,11 +66,14 @@ class MapWidget(QLabel):
         # Set map widget's size with a 2 px margin for border line rendering
         self.setFixedSize(self.mapSideX + 2, self.mapSideY + 2)
 
-        # self.zoneCoord = self.window.params['zoneCoord']  #!!!
-        # self.numZones = self.zoneCoord.max()
         zones = np.unique(self.zoneCoord)
         zones = zones[zones > 0]
-        self.numZones = len(zones)  #??? Could be easier?
+        self.numZones = len(zones)
+        # Holds newly selected zone values before adding them
+        # to global zoneCoord with the 'Add zone" button
+        self.bufferZoneCoord = np.zeros((self.params['numLasersY'],
+                                         self.params['numLasersX']),
+                                        dtype=int)
 
         self.drawMap()
         self.window.adjustSize()
@@ -78,7 +81,7 @@ class MapWidget(QLabel):
         self.createMapButtons()
 
     def drawMap(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Create empty map '''
 
@@ -107,12 +110,11 @@ class MapWidget(QLabel):
         gridPainter.end()
 
         self.updateMapZones()
-        self.updateMap()
 
         self.setStyleSheet(ColorStyle.mapStyleSheet(self.numZones))
 
     def updateMap(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Add Zone and Path layers to the map widget '''
 
@@ -126,9 +128,15 @@ class MapWidget(QLabel):
         self.setPixmap(self.mapCanvas)
 
     def updateMapZones(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Update map area coloring based on zone selection '''
+
+        # Display global zoneCoord...
+        zoneCoord = self.zoneCoord.copy()
+        # ...updated with newly selected areas that are not yet saved
+        hasValues = np.where(self.bufferZoneCoord)
+        zoneCoord[hasValues] = self.bufferZoneCoord[hasValues]
 
         self.zoneLayer.fill(Qt.transparent)
 
@@ -137,7 +145,7 @@ class MapWidget(QLabel):
         # Fill cells with color
         for i in range(self.numLasersY):
             for j in range(self.numLasersX):
-                zone = self.zoneCoord[i][j]
+                zone = zoneCoord[i][j]
                 zoneColor = QColor(*ColorStyle.zoneColors[zone], int(0.3*255))
                 zonePainter.setBrush(zoneColor)
                 x = self.cellX * j
@@ -149,7 +157,7 @@ class MapWidget(QLabel):
         self.updateMap()
 
     def updateMapPath(self, start, end):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Draw path in Selected time '''
 
@@ -168,7 +176,7 @@ class MapWidget(QLabel):
         self.updateMap()
 
     def makePath(self, df):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Make array of path QPoints for visualization '''
 
@@ -188,7 +196,7 @@ class MapWidget(QLabel):
         return polyline
 
     def newAreaButton(self, newBtnId, checked):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' A new area button was checked '''
 
@@ -214,7 +222,7 @@ class MapWidget(QLabel):
 
     @pyqtSlot()
     def addNewZone(self, numNewZones=1):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         '''
         Add a new zone to map and table from two sources:
@@ -223,6 +231,12 @@ class MapWidget(QLabel):
             - predefined areas:
                 numNewZones = 2 or 3
         '''
+
+        # Save newly selected areas to global zoneCoord
+        hasValues = np.where(self.bufferZoneCoord)
+        self.zoneCoord[hasValues] = self.bufferZoneCoord[hasValues]
+        # Clear selected area buffer
+        self.bufferZoneCoord[...] = 0
 
         for i in range(numNewZones):
             self.numZones += 1
@@ -237,7 +251,7 @@ class MapWidget(QLabel):
             return
 
     def updateZoneNumber(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Uncheck all map buttons, disable 'New zone' button, update table '''
 
@@ -249,25 +263,18 @@ class MapWidget(QLabel):
             layout = self.mapLayout.widget(i).layout()
             for j in range(layout.count()):
                 button = layout.itemAt(j).widget()
-                # Uncheck 'em quietly
+                # Uncheck them quietly
                 with QSignalBlocker(button):
                     button.setChecked(False)
 
-        # for zone in range(1, self.numZones + 1):
-        #     if zone not in self.zoneCoord:
-        #         self.zoneCoord = np.where(self.zoneCoord < zone,
-        #                                   self.zoneCoord,
-        #                                   self.zoneCoord - 1)
-        #         self.numZones -= 1
         self.setStyleSheet(ColorStyle.mapStyleSheet(self.numZones))
         self.window.table.fillTable()
 
     def fillPredefinedZones(self, newBtn):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         nX = self.numLasersX
         nY = self.numLasersY
-
 
         numNewZones = 2  # For halves or center/periphery
 
@@ -297,11 +304,10 @@ class MapWidget(QLabel):
 
         self.updateMapZones()
         self.numZones = 0
-        # self.table.setcolumnCount(1)
         self.addNewZone(numNewZones=numNewZones)
 
     def mapBtnToggled(self, checked, x=-1, y=-1, s=-1):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         '''
         Actions when a map button was checked (add area for a new zone).
@@ -321,19 +327,19 @@ class MapWidget(QLabel):
 
         # Assign the area checked with a custom button to the new zone
         if buttonType == 'cell':
-            self.zoneCoord[x][y] = zoneValue
+            self.bufferZoneCoord[x][y] = zoneValue
         elif buttonType == 'column':
-            self.zoneCoord[:,y] = zoneValue
+            self.bufferZoneCoord[:,y] = zoneValue
         elif buttonType == 'row':
-            self.zoneCoord[x,:] = zoneValue
+            self.bufferZoneCoord[x,:] = zoneValue
         elif buttonType == 'square':
-            self.zoneCoord[[s, -s-1], s:self.numLasersX-s] = zoneValue
-            self.zoneCoord[s:self.numLasersY-s, [s, -s-1]] = zoneValue
+            self.bufferZoneCoord[[s, -s-1], s:self.numLasersX-s] = zoneValue
+            self.bufferZoneCoord[s:self.numLasersY-s, [s, -s-1]] = zoneValue
 
         self.updateMapZones()
 
     def defineAreaTypes(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         '''
         Define custom and predefined areas,
@@ -356,7 +362,7 @@ class MapWidget(QLabel):
                            in enumerate(self.customAreas + self.predefinedAreas)}
 
     def createMapButtons(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.mapLayout = QStackedLayout(self)
 
@@ -365,14 +371,13 @@ class MapWidget(QLabel):
             # and add them to self.mapLayout - a QStackedLayout
             if name in self.customAreas:
                 areaMap = self.customAreaMethods[idx]()
-                # print(areaMap) #???
                 self.mapLayout.insertWidget(idx, areaMap)
 
         # Set cell (id = 0) as default area type
         self.areaBtnGroup.button(0).setChecked(True)
 
     def defineCellMapButtons(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' One cell map button, corresponds to one laser intersection '''
 
@@ -397,7 +402,7 @@ class MapWidget(QLabel):
         return cellMap
 
     def defineColumnMapButtons(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Map buttons are vertical columns '''
 
@@ -419,7 +424,7 @@ class MapWidget(QLabel):
         return columnMap
 
     def defineRowMapButtons(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Map buttons are horizontal rows '''
 
@@ -441,7 +446,7 @@ class MapWidget(QLabel):
         return rowMap
 
     def defineSquareMapButtons(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Map buttons are concentric squares '''
 
@@ -481,12 +486,10 @@ class MapWidget(QLabel):
                 lambda checked, i=s:
                     self.mapBtnToggled(checked=checked, s=i))
 
-        print(self.zoneCoord)
-
         return squareMap
 
     def defineClearMapButton(self, size):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.clearMapButton = QPushButton()
         self.clearMapButton.setFixedSize(size, size)
@@ -500,13 +503,16 @@ class MapWidget(QLabel):
         self.clearMapButton.clicked.connect(self.clearMap)
 
     def clearMap(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.numZones = 0
-        # self.table.setcolumnCount(1)
 
-        # Deselect all map areas
+        # Deselect all map areas from global zoneCoord...
         self.zoneCoord[:, :] = 0
+        # ...and from buffer for newly selected areas
+        self.bufferZoneCoord = np.zeros((self.params['numLasersY'],
+                                         self.params['numLasersX']),
+                                        dtype=int)
         self.updateMapZones()
 
         # Uncheck all map buttons, update table
@@ -516,8 +522,17 @@ class MapWidget(QLabel):
         self.areaBtnGroup.button(0).setChecked(True)
 
     def deleteMap(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
+        # Change size of zoneCoord and fill it with zeros in-place
+        self.zoneCoord.resize((self.params['numLasersY'],
+                               self.params['numLasersX']),
+                              refcheck=False)
+        self.zoneCoord[:, :] = np.zeros((self.params['numLasersY'],
+                                         self.params['numLasersX']),
+                                        dtype=int)
+
+        # Delete map buttons
         while self.mapLayout.count():
             item = self.mapLayout.takeAt(0)
             widget = item.widget()
@@ -528,16 +543,15 @@ class MapWidget(QLabel):
         sip.delete(self.mapLayout)
 
     def createAreaButtons(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Create area type buttons, arranged vertically to the left of the map '''
 
-        # numAreaBtn = len(self.areaBtnIdx)
+        # numAreaBtn = len(self.areaBtnIdx)  #TODO:??? Depend on window size
         # size = int(self.mapSideY / (numAreaBtn * 1.5))
         size = 30
 
         self.areaBtnGroup = QButtonGroup()
-        # self.areaBtnGroup.setExclusive(True) #???
         self.areaTypeBtnLayout = QVBoxLayout()
         self.clearBtnLayout = QGridLayout()
         self.areaBtnLayout = QGridLayout()
@@ -569,8 +583,6 @@ class MapWidget(QLabel):
         self.areaTypeBtnLayout.setSpacing(size // 2)
         # Add additional spacing between custom and predefined area buttons
         self.areaTypeBtnLayout.insertSpacing(len(self.customAreas), size // 2)
-
-        # self.areaTypeBtnLayout.setContentsMargins(0, 0, 0, 0)
 
         self.areaBtnLayout.addLayout(self.areaTypeBtnLayout, 0, 0)
         self.areaBtnLayout.addWidget(self.clearMapButton, 0, 1, alignment=Qt.AlignBottom)

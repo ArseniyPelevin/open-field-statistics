@@ -1,19 +1,7 @@
-import sys
-from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtCore import Qt
-import pandas as pd
-import numpy as np
 import inspect
-import os
-import csv
 
-from PyQt6.QtWidgets import (QFileDialog,
-    QTableView, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStyleFactory
-    )
-from PyQt6.QtCore import (
-    Qt, QSize, QEvent, QPointF, QAbstractTableModel
-    )
+from PyQt6.QtWidgets import QTableView, QHeaderView, QAbstractItemView
+from PyQt6.QtCore import Qt, QAbstractTableModel
 from PyQt6.QtGui import QColor
 
 from superqt import QRangeSlider
@@ -21,10 +9,10 @@ from superqt import QRangeSlider
 from color_style import ColorStyle
 
 
-class TableModel(QtCore.QAbstractTableModel):
+class TableModel(QAbstractTableModel):
 
     def __init__(self, data, window):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         super(TableModel, self).__init__()
 
@@ -32,7 +20,7 @@ class TableModel(QtCore.QAbstractTableModel):
         self.window = window
 
     def data(self, index, role):
-        # print(__name__, inspect.currentframe().f_code.co_name)
+        # print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         numStatParam = len(self.window.settings.params['statParams'])
 
@@ -55,17 +43,17 @@ class TableModel(QtCore.QAbstractTableModel):
             return QColor(*color)
 
     def rowCount(self, index):
-        # print(__name__, inspect.currentframe().f_code.co_name)
+        # print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         return self._data.shape[0]
 
     def columnCount(self, index):
-        # print(__name__, inspect.currentframe().f_code.co_name)
+        # print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         return self._data.shape[1]
 
     def headerData(self, section, orientation, role):
-        # print(__name__, inspect.currentframe().f_code.co_name)
+        # print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         # Section is the index of the column/row.
         if role == Qt.DisplayRole:
@@ -81,7 +69,7 @@ class TableModel(QtCore.QAbstractTableModel):
                 return f'{self._data.index[section][0]}, {self._data.index[section][1]}'
 
     def updateData(self, data):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.layoutAboutToBeChanged.emit()
         self._data = data
@@ -90,7 +78,7 @@ class TableModel(QtCore.QAbstractTableModel):
 
 class TableView(QTableView):
     def __init__(self, window, app):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         super().__init__()
 
@@ -105,7 +93,7 @@ class TableView(QTableView):
         self.setTable()
 
     def setTable(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         # Forbid user to touch anything in the table
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -125,7 +113,7 @@ class TableView(QTableView):
         self.adjustSize()
 
     def tableWidth(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.app.processEvents()
         self.app.processEvents()
@@ -138,14 +126,14 @@ class TableView(QTableView):
         return tableWidth
 
     # def tableHeight(self):
-    #     print(__name__, inspect.currentframe().f_code.co_name)
+    #     print(__class__.__name__, inspect.currentframe().f_code.co_name)
     #     tableHeight = self.verticalHeader().length() + \
     #                   self.horizontalHeader().height() + \
     #                   self.frameWidth() * 2
     #     return tableHeight
 
     def renameStatisticsHeaders(self, data):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         return (data
                 .rename(index={'time': 'Time (s)',
@@ -157,7 +145,7 @@ class TableView(QTableView):
                 )
 
     def fillTable(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name, inspect.currentframe().f_back.f_code.co_name)
 
         ''' Fill table with statistics '''
 

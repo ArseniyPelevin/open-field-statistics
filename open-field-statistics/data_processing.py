@@ -1,22 +1,23 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import inspect
 
 
 class DataProcessing():
     def __init__(self, window):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
+        self.window = window
         self.params = window.settings.params
         self.zoneCoord = window.map.zoneCoord
         self.timeParams = window.time.timeParams
 
         self.has_file = False
-        self.zones = np.array([])
+        self.zones = np.array([])  # List of existing zone numbers
         self.dummy_data = self.make_dummy_data()
 
     def make_dummy_data(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Make empty data to display table before any file was loaded '''
 
@@ -31,8 +32,8 @@ class DataProcessing():
                 )
             )
 
-    def read(self, df):
-        print(__name__, inspect.currentframe().f_code.co_name)
+    def checkDataToField(self, df):
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Read loaded .csv file with raw data and save as pandas dataframe '''
 
@@ -44,20 +45,15 @@ class DataProcessing():
         if max_y <= self.params['numLasersY']:
             max_y = 0
 
-        # Data correspond to field settings
-        if not (max_x or max_y):
-            self.df = self.process_raw_data(df)
-            self.has_file = True
-
         return max_x, max_y
 
     def process_raw_data(self, df):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Preprocess raw data independent of time and zone parameters '''
 
         # Exclude rows with any of four coordinates missing
-#TODO Let user define this behavior in Settings (Start of recording/First beam break)
+#TODO mention this behavior in documentation
         df = df.loc[(df.loc[:, 'x1':'y2'] != 0).all(axis=1)]
 
         # Absolute timestamps to timedeltas since start
@@ -101,10 +97,10 @@ class DataProcessing():
 
         df = df.rename_axis(columns='stats')
 
-        return df
+        self.df = df
 
     def pivot_zone_wise(self, df, index):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         df = (df
               .rename(columns={'x': 'time', 'dz': 'rearing_n', 'z': 'rearing_time'})
@@ -125,18 +121,14 @@ class DataProcessing():
         return df
 
     def get_data(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
-
-        # Update again here, because self.params['zoneCoord'] object
-        # could have changed since __init__
-        # self.zoneCoord = self.params['zoneCoord'] #!!!
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         # List of existing zones (some could have been fully deselected)
         self.zones = np.unique(self.zoneCoord)
         self.zones = self.zones[self.zones > 0]
 
         # Without loaded file return an empty table
-        if not self.has_file:
+        if not self.window.file.hasDataFile:
             return self.make_dummy_data()
 
         start = self.timeParams['startSelected']
@@ -230,5 +222,5 @@ class DataProcessing():
         if abs(total_time - selected_time) < 0.5:
             data = data.drop(index='Selected_time', level=0)
 
-        self.data = data  #???
+        self.data = data
         return data

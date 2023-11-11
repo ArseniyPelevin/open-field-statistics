@@ -1,36 +1,25 @@
-import json
 import os
-import inspect
 import copy
-import numpy as np
+import json
+import inspect
 import pandas as pd
 
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QFileDialog, QToolTip,
-    QLabel, QLineEdit, QPushButton, QButtonGroup, QSpacerItem,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
-    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStyleFactory,
-    QDialog, QDialogButtonBox,
-    QGroupBox, QCheckBox, QSpinBox, QDoubleSpinBox, QComboBox, QMessageBox
-)
-from PyQt6.QtCore import (
-    Qt, QSize, pyqtSlot, QEvent, QPointF, QVariantAnimation, QRegularExpression, QDir
-    )
-from PyQt6.QtGui import (
-    QFontMetrics, QIcon,
-    QPen, QPixmap, QPainter, QColor, QPalette,
-    QRegularExpressionValidator, QIntValidator, QDoubleValidator, QAction
-)
+from PyQt6.QtWidgets import (QFileDialog, QMessageBox,
+                             QLabel, QPushButton)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFontMetrics, QAction
 
 from superqt import QRangeSlider
 
+
 class File:
     def __init__(self, window):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.window = window
         self.params = self.window.settings.params
+
+        self.hasDataFile = False
 
         self.dataFilters = '''CSV (comma delimited) (*.csv)'''#;;
                               # Text (tab delimited) (*.txt);;
@@ -39,7 +28,7 @@ class File:
         self.setButtons()
 
     def setButtons(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.loadFileButton = QPushButton('Select data')
         self.loadFileButton.setFixedWidth(80)
@@ -54,7 +43,7 @@ class File:
         self.saveDataButton.clicked.connect(self.saveData)
 
     def setFileMenu(self, menu):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         fileMenu = menu.addMenu('File')
 
@@ -87,26 +76,30 @@ class File:
         self.fileItems.loc['saveData', 'action'].setDisabled(True)
         self.fileItems.loc['saveMap', 'action'].setDisabled(True)
 
-    def loadData(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+    def loadData(self, loadDataFile=None):
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Load raw data file, get statistics, update map and table '''
 
-        # Make raw data file's name an atribute
-        # to suggest name for output statistics file
-        self.loadDataFile, filter = QFileDialog.getOpenFileName(
-            parent=self.window,
-            caption=self.fileItems.loc['loadData', 'caption'],
-            directory=self.params['dirs']['loadData'],
-            filter=self.dataFilters
-            )
+        # Open FileDialog if it is original 'Load raw data' call.
+        # Do not open FileDialog for reloading the same data file for new params
+        isNewDataFile = False
+        if not loadDataFile:
+            loadDataFile, filter = QFileDialog.getOpenFileName(
+                parent=self.window,
+                caption=self.fileItems.loc['loadData', 'caption'],
+                directory=self.params['dirs']['loadData'],
+                filter=self.dataFilters
+                )
+            # FileDialog was exited with cancel
+            if not loadDataFile:
+                return
+            isNewDataFile = True
 
-        # FileDialog was exited with cancel
-        if not self.loadDataFile:
-            return
+        self.hasDataFile = True
 
-        self.raw_df = pd.read_csv(
-            self.loadDataFile,
+        raw_df = pd.read_csv(
+            loadDataFile,
             sep=None,   # Uses 'csv.Sniffer' for decimal separator,
             # needs python engine
             engine='python',
@@ -116,47 +109,43 @@ class File:
             index_col=0
             )
 
-        # Data are incompatible to current parameters
-        if not self.updateData():
+        # Check if data correspond to field settings
+        maxX, maxY = self.window.stat.checkDataToField(raw_df)
+        # Show warning message and abort if not
+        if maxX or maxY:
+            self.incorrectData(maxX, maxY)
+            self.hasDataFile = False
             return
 
-        # Set file name label
-        metrix = QFontMetrics(self.fileNameLabel.font())
-        width = self.fileNameLabel.width() - 2;
-        clippedText = metrix.elidedText(self.loadDataFile, Qt.ElideMiddle, width)
-        self.fileNameLabel.setText(clippedText)
+        self.window.stat.process_raw_data(raw_df)
+
+        # If new data - update time variables to default (based on loaded data)
+        if isNewDataFile:
+            self.window.time.loadTimeVariables(self.window.stat)
+        # If old data - skip loading default variables and directly load time widgets
+        else:
+            self.window.time.loadTimeWidgets()
+
+        # Update path on map
+        self.window.map.updateMapPath(
+            self.window.time.timeParams['startSelected'],
+            self.window.time.timeParams['endSelected'])
+
+        # Get statistics and fill the table
+        self.window.table.fillTable()
 
         # After raw data were loaded, allow saving output data
         self.fileItems.loc['saveData', 'action'].setEnabled(True)
         # self.fileItems.loc['saveMap', 'action'].setEnabled(True) #TODO
         self.saveDataButton.setEnabled(True)
 
-    def updateData(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
-
-        if hasattr(self, 'loadDataFile') and self.loadDataFile:
-            maxX, maxY = self.window.stat.read(self.raw_df) #??? attr here?
-            # Check if data correspond to field settings
-            if maxX or maxY:
-                self.incorrectData(maxX, maxY)
-                return False
-
-            # Update time variables based on loaded data
-            self.window.time.loadTimeVariables(self.window.stat)
-
-            # Update path on map
-            self.window.map.updateMapPath(
-                self.window.time.timeParams['startSelected'],
-                self.window.time.timeParams['endSelected'])
-
-        # Get statistics and fill the table
-        self.window.table.fillTable()
-
-        # Confirm to sender (loadData or loadParams) that data are correct
-        return True
+        # Reuse file name later to suggest name for output statistics file,
+        # and to reload this data if they fit a new params file
+        self.loadDataFile = loadDataFile
+        self.updateDataFileNameLabel(self.loadDataFile)
 
     def incorrectData(self, maxX, maxY):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         warningMessage = ('Loaded raw data do not correspond to the '
                           + 'field parameters specified:\n\n')
@@ -174,17 +163,32 @@ class File:
 
         QMessageBox.warning(self.window, 'Incorrect raw data', warningMessage)
 
-    def loadParams(self, loadParamsFile=None):
-        print(__name__, inspect.currentframe().f_code.co_name)
+    def updateDataFileNameLabel(self, loadDataFile):
+        metrix = QFontMetrics(self.fileNameLabel.font())
+        width = self.fileNameLabel.width() - 2;
+        clippedDataFileName = metrix.elidedText(loadDataFile,
+                                                Qt.ElideMiddle, width)
+        self.fileNameLabel.setText(clippedDataFileName)
 
-        # Called to open FileDialog, not to load recentSettings
-        if not loadParamsFile:
-            loadParamsFile, _filter = QFileDialog.getOpenFileName(
-                parent=self.window,
-                caption=self.fileItems.loc['loadParams', 'caption'],
-                directory=self.params['dirs']['params'],
-                filter='JSON (*.json)'
-                )
+    def deleteData(self):
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
+
+        ''' If numLasers parameter was changed - reset zoneCoord '''
+
+        self.updateDataFileNameLabel('')
+
+        self.window.map.deleteMap()
+        self.window.time.deleteTime()
+
+    def loadParams(self):
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
+
+        loadParamsFile, _filter = QFileDialog.getOpenFileName(
+            parent=self.window,
+            caption=self.fileItems.loc['loadParams', 'caption'],
+            directory=self.params['dirs']['params'],
+            filter='JSON (*.json)'
+            )
 
         # FileDialog was exited with cancel
         if not loadParamsFile:
@@ -193,26 +197,41 @@ class File:
         with open(loadParamsFile, 'r', newline='') as file:
             params = json.load(file)
 
+        # Check if the same data file (if any) can be used with the new parameters
+        if self.hasDataFile:
+            # All field parameters are the same as before
+            for param in ['numLasersX', 'numLasersY', 'boxSideX', 'boxSideY']:
+                if params['settings'][param] != self.window.settings.params[param]:
+                    self.hasDataFile = False
+                    break
+            # endSelected of new parameters is no more than totalTime of old data
+            if params['timeParams']['endSelected'] > self.window.time.totalTime:
+                self.hasDataFile = False
+
         # Update settings
         self.window.settings.params.update(params['settings'])
 
-        # Update map
+        self.deleteData()
+
+        # Update zoneCoord
         self.window.map.zoneCoord.resize((self.params['numLasersY'],
                                           self.params['numLasersX']),
-                                         refcheck=False)
+                                          refcheck=False)
         self.window.map.zoneCoord[:, :] = params['zoneCoord']
-        self.window.map.deleteMap()
+
         self.window.map.loadMap()
 
-        # Update time (if data were loaded and correspond to timeParams)
-        if (self.window.stat.has_file and
-           params['timeParams']['endSelected'] <= self.window.time.totalTime):
+        # Update time and load back existing data (if they correspond to new params)
+        if self.hasDataFile:
             self.window.time.timeParams.update(params['timeParams'])
+            self.loadData(self.loadDataFile)
+            return  # fillTable will be called from loadData() in this case
 
-        self.updateData()
+        # Fill table with empty dataframe
+        self.window.table.fillTable()
 
     def saveData(self):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         # Take loadDataFile's name and drop file extension
         self.loadDataFileName = os.path.splitext(self.loadDataFile)[0]
@@ -237,7 +256,7 @@ class File:
                                          decimal=self.params['decimal'])
 
     def saveParams(self, saveParamsFile=None):
-        print(__name__, inspect.currentframe().f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         # File was not provided by sender
         # (as if called from Settings.saveRecentSettings)
