@@ -238,7 +238,8 @@ class File:
         print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         # Take loadDataFile's name and drop file extension
-        self.loadDataFileName = os.path.splitext(self.loadDataFile)[0]
+        self.loadDataFileName = os.path.splitext(
+                                    os.path.basename(self.loadDataFile))[0]
         path = os.path.join(
             self.params['dirs']['saveData'],
             f"{self.loadDataFileName}_statistics")

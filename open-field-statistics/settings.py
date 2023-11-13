@@ -31,8 +31,8 @@ DEFAULT_SETTINGS = {
     'statParams': ALL_STAT_PARAMS,
 
     # Sampling parameters
-    'samplingFrequency': 0.1,  #???
-    'startTime': 1,  # First beam break
+    # 'samplingFrequency': 0.1,  #???
+    # 'startTime': 1,  # First beam break
 
     # Output parameters:
     'separator': ';',
@@ -67,6 +67,7 @@ class Settings():
 
         self.settingsDialog = self.SettingsDialog(self.window, self.params)
         newSettings = self.settingsDialog.show()
+        newSettings['statParams'].sort(key = lambda i: ALL_STAT_PARAMS.index(i))
         if newSettings:
             self.params.update(newSettings)
             if self.settingsDialog.fieldParameterChanged:
@@ -81,7 +82,7 @@ class Settings():
 
         path = os.path.join('temp', 'recent_settings.json')
         with open(path, 'w+', newline='') as file:
-            json.dump(self.params, file)
+            json.dump(self.params, file, indent='\t')
 
 
     class SettingsDialog(QDialog):
@@ -105,7 +106,7 @@ class Settings():
             self.layout.addWidget(self.createFileGroup())
             self.layout.addWidget(self.createFieldParametersGroup())
             self.layout.addWidget(self.createStatisticsGroup())
-            self.layout.addWidget(self.createSamplingGroup())  #???
+            # self.layout.addWidget(self.createSamplingGroup())  #???
             self.layout.addWidget(self.createOutputFormatGroup())
 
             self.layout.addWidget(self.buttonBox)
@@ -285,35 +286,35 @@ class Settings():
             return statisticsGroup
 
         #FIXME Delete it all?
-        def createSamplingGroup(self):
-            print(__class__.__name__, inspect.currentframe().f_code.co_name)
+        # def createSamplingGroup(self):
+        #     print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
-            samplingGroup = QGroupBox('Sampling parameters')
-            samplingGroupLayout = QGridLayout(samplingGroup)
+        #     samplingGroup = QGroupBox('Sampling parameters')
+        #     samplingGroupLayout = QGridLayout(samplingGroup)
 
-            samplingFrequencyLabel = QLabel('Sampling frequency (s)')
-            samplingFrequency = QDoubleSpinBox()
-            samplingFrequency.setRange(0.1, 1)
-            samplingFrequency.setSingleStep(0.1)
-            samplingFrequency.setSuffix(' s')
-            samplingFrequency.setValue(self.tempSettings['samplingFrequency'])
+        #     samplingFrequencyLabel = QLabel('Sampling frequency (s)')
+        #     samplingFrequency = QDoubleSpinBox()
+        #     samplingFrequency.setRange(0.1, 1)
+        #     samplingFrequency.setSingleStep(0.1)
+        #     samplingFrequency.setSuffix(' s')
+        #     samplingFrequency.setValue(self.tempSettings['samplingFrequency'])
 
-            startTimeLabel = QLabel('Start time from: ')
-            startTime = QComboBox()
-            startTime.addItems(['Start of recording', 'First beam break'])
-            startTime.setCurrentIndex(self.tempSettings['startTime'])
+        #     startTimeLabel = QLabel('Start time from: ')
+        #     startTime = QComboBox()
+        #     startTime.addItems(['Start of recording', 'First beam break'])
+        #     startTime.setCurrentIndex(self.tempSettings['startTime'])
 
-            samplingFrequency.valueChanged.connect(lambda val:
-               self.tempSettings.update({'samplingFrequency': val}))
-            startTime.currentIndexChanged.connect(lambda val:
-               self.tempSettings.update({'startTime': val}))
+        #     samplingFrequency.valueChanged.connect(lambda val:
+        #        self.tempSettings.update({'samplingFrequency': val}))
+        #     startTime.currentIndexChanged.connect(lambda val:
+        #        self.tempSettings.update({'startTime': val}))
 
-            samplingGroupLayout.addWidget(samplingFrequencyLabel, 0, 0)
-            samplingGroupLayout.addWidget(samplingFrequency, 0, 1)
-            samplingGroupLayout.addWidget(startTimeLabel, 1, 0)
-            samplingGroupLayout.addWidget(startTime, 1, 1)
+        #     samplingGroupLayout.addWidget(samplingFrequencyLabel, 0, 0)
+        #     samplingGroupLayout.addWidget(samplingFrequency, 0, 1)
+        #     samplingGroupLayout.addWidget(startTimeLabel, 1, 0)
+        #     samplingGroupLayout.addWidget(startTime, 1, 1)
 
-            return samplingGroup
+        #     return samplingGroup
 
         #??? Just trust some locale?
         def createOutputFormatGroup(self):

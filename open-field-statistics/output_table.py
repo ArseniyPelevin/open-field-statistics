@@ -139,7 +139,7 @@ class TableView(QTableView):
                 )
 
     def fillTable(self):
-        print(__class__.__name__, inspect.currentframe().f_code.co_name, inspect.currentframe().f_back.f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Fill table with statistics '''
 

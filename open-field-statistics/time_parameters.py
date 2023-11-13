@@ -99,7 +99,7 @@ class TimeParameters:
         self.timeGroup.setDisabled(True)
 
     def loadTimeVariables(self, stat):
-        print(__class__.__name__, inspect.currentframe().f_code.co_name, inspect.currentframe().f_back.f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Update time variables based on loaded raw data '''
 
@@ -115,7 +115,7 @@ class TimeParameters:
         self.loadTimeWidgets()
 
     def loadTimeWidgets(self):
-        print(__class__.__name__, inspect.currentframe().f_code.co_name, inspect.currentframe().f_back.f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Update time widgets based on loaded raw data '''
 
@@ -276,7 +276,7 @@ class TimeParameters:
         self.updatePeriod(period)
 
     def updatePeriod(self, period):
-        print(__class__.__name__, inspect.currentframe().f_code.co_name, inspect.currentframe().f_back.f_code.co_name)
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         '''
         Selected time is split to periods of user-defined length in seconds.
