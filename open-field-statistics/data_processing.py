@@ -222,5 +222,4 @@ class DataProcessing():
         if abs(total_time - selected_time) < 0.5:
             data = data.drop(index='Selected_time', level=0)
 
-        self.data = data
         return data

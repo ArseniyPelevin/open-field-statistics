@@ -20,7 +20,6 @@ class TableModel(QAbstractTableModel):
         self.window = window
 
     def data(self, index, role):
-        # print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         numStatParam = len(self.window.settings.params['statParams'])
 
@@ -43,17 +42,12 @@ class TableModel(QAbstractTableModel):
             return QColor(*color)
 
     def rowCount(self, index):
-        # print(__class__.__name__, inspect.currentframe().f_code.co_name)
-
         return self._data.shape[0]
 
     def columnCount(self, index):
-        # print(__class__.__name__, inspect.currentframe().f_code.co_name)
-
         return self._data.shape[1]
 
     def headerData(self, section, orientation, role):
-        # print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         # Section is the index of the column/row.
         if role == Qt.DisplayRole:

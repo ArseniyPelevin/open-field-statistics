@@ -521,8 +521,10 @@ class MapWidget(QLabel):
         # Set cell (id = 0) as the default area type
         self.areaBtnGroup.button(0).setChecked(True)
 
-    def deleteMap(self):
+    def deleteMapButtons(self):
         print(__class__.__name__, inspect.currentframe().f_code.co_name)
+
+        ''' Delete all map button objects by deleting their parent widgets '''
 
         # Change size of zoneCoord and fill it with zeros in-place
         self.zoneCoord.resize((self.params['numLasersY'],

@@ -3,6 +3,7 @@ import copy
 import json
 import inspect
 import pandas as pd
+import numpy as np
 
 from PyQt6.QtWidgets import (QFileDialog, QMessageBox,
                              QLabel, QPushButton)
@@ -76,14 +77,14 @@ class File:
         self.fileItems.loc['saveData', 'action'].setDisabled(True)
         self.fileItems.loc['saveMap', 'action'].setDisabled(True)
 
-    def loadData(self, loadDataFile=None):
+    def loadData(self, loadDataFile=None, defaultTimeVariables=True):
         print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         ''' Load raw data file, get statistics, update map and table '''
 
         # Open FileDialog if it is original 'Load raw data' call.
         # Do not open FileDialog for reloading the same data file for new params
-        isNewDataFile = False
+        # isNewDataFile = False
         if not loadDataFile:
             loadDataFile, filter = QFileDialog.getOpenFileName(
                 parent=self.window,
@@ -94,8 +95,7 @@ class File:
             # FileDialog was exited with cancel
             if not loadDataFile:
                 return
-            isNewDataFile = True
-
+            # isNewDataFile = True
         self.hasDataFile = True
 
         raw_df = pd.read_csv(
@@ -120,7 +120,7 @@ class File:
         self.window.stat.process_raw_data(raw_df)
 
         # If new data - update time variables to default (based on loaded data)
-        if isNewDataFile:
+        if defaultTimeVariables:
             self.window.time.loadTimeVariables(self.window.stat)
         # If old data - skip loading default variables and directly load time widgets
         else:
@@ -164,6 +164,8 @@ class File:
         QMessageBox.warning(self.window, 'Incorrect raw data', warningMessage)
 
     def updateDataFileNameLabel(self, loadDataFile):
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
+
         metrix = QFontMetrics(self.fileNameLabel.font())
         width = self.fileNameLabel.width() - 2;
         clippedDataFileName = metrix.elidedText(loadDataFile,
@@ -177,7 +179,7 @@ class File:
 
         self.updateDataFileNameLabel('')
 
-        self.window.map.deleteMap()
+        self.window.map.deleteMapButtons()
         self.window.time.deleteTime()
 
     def loadParams(self):
@@ -197,34 +199,36 @@ class File:
         with open(loadParamsFile, 'r', newline='') as file:
             params = json.load(file)
 
-        # Check if the same data file (if any) can be used with the new parameters
+        # Check if old data (if any) can be used with new parameters.
+        #TIP If new field params differ from data's field params - DISCARD DATA
         if self.hasDataFile:
-            # All field parameters are the same as before
+            # All field params are the same as before?
             for param in ['numLasersX', 'numLasersY', 'boxSideX', 'boxSideY']:
                 if params['settings'][param] != self.window.settings.params[param]:
                     self.hasDataFile = False
                     break
-            # endSelected of new parameters is no more than totalTime of old data
-            if params['timeParams']['endSelected'] > self.window.time.totalTime:
-                self.hasDataFile = False
 
         # Update settings
         self.window.settings.params.update(params['settings'])
 
+        # Delete data in any case, bring field and time params to defaults
+        # according to the new settings
         self.deleteData()
 
-        # Update zoneCoord
-        self.window.map.zoneCoord.resize((self.params['numLasersY'],
-                                          self.params['numLasersX']),
-                                          refcheck=False)
+        # Update zoneCoord, implement zone map from new parameters
         self.window.map.zoneCoord[:, :] = params['zoneCoord']
-
         self.window.map.loadMap()
 
-        # Update time and load back existing data (if they correspond to new params)
+        # Update time parameters and load back existing data (if appropriate)
         if self.hasDataFile:
-            self.window.time.timeParams.update(params['timeParams'])
-            self.loadData(self.loadDataFile)
+            #TIP If new time params are incompatible with data - DISCARD TIME PARAMS
+            defaultTimeVariables = True
+            # endSelected of new parameters is no more than totalTime of old data?
+            if params['timeParams']['endSelected'] <= self.window.time.totalTime:
+                self.window.time.timeParams.update(params['timeParams'])
+                defaultTimeVariables = False
+
+            self.loadData(self.loadDataFile, defaultTimeVariables)
             return  # fillTable will be called from loadData() in this case
 
         # Fill table with empty dataframe
