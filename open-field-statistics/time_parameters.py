@@ -30,37 +30,38 @@ class TimeParameters:
 
         self.periodLabel = QLabel('Time period every ')
 
-        self.periodLine = DoubleSpinBox(alignment=Qt.AlignRight)
+        self.periodLine = DoubleSpinBox(alignment=Qt.AlignmentFlag.AlignRight)
         self.periodLine.setFixedWidth(60)
         self.periodLine.setDecimals(1)
         self.periodLine.setSuffix(' s')
-        self.periodLine.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.periodLine.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.periodLine.setCorrectionMode('max')
         self.periodLine.setKeyboardTracking(False)
 
-        self.startSelectedLine = DoubleSpinBox(alignment=Qt.AlignLeft)
+        self.startSelectedLine = DoubleSpinBox(alignment=Qt.AlignmentFlag.AlignLeft)
         self.startSelectedLine.setFixedWidth(60)
         self.startSelectedLine.setDecimals(1)
         self.startSelectedLine.setSuffix(' s')
-        self.startSelectedLine.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.startSelectedLine.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.startSelectedLine.setCorrectionMode('min')
         self.startSelectedLine.setKeyboardTracking(False)
 
-        self.endSelectedLine = DoubleSpinBox(alignment=Qt.AlignRight)
+        self.endSelectedLine = DoubleSpinBox(alignment=Qt.AlignmentFlag.AlignRight)
         self.endSelectedLine.setFixedWidth(60)
         self.endSelectedLine.setDecimals(1)
         self.endSelectedLine.setSuffix(' s')
-        self.endSelectedLine.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        self.endSelectedLine.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.endSelectedLine.setCorrectionMode('max')
         self.endSelectedLine.setKeyboardTracking(False)
 
-        self.timeRangeSlider = QRangeSlider(Qt.Horizontal)
+        self.timeRangeSlider = QRangeSlider(Qt.Orientation.Horizontal)
 
         self.selectedTimeLabel = QLabel()
 
         # Default LineEdit background will be needed for error warning
         self.defaultLineEditBackground = self.periodLine.palette().color(
-                                         QPalette.Active, QPalette.Base)
+                                         QPalette.ColorGroup.Active,
+                                         QPalette.ColorRole.Base)
 
     def setTimeSignals(self):
         print(__class__.__name__, inspect.currentframe().f_code.co_name)
@@ -83,18 +84,26 @@ class TimeParameters:
         self.timeLayout = QGridLayout(self.timeGroup)
 
         self.timeRangeLayout = QGridLayout()
-        self.timeRangeLayout.addWidget(self.startSelectedLine, 0, 0, Qt.AlignLeft)
-        self.timeRangeLayout.addWidget(self.selectedTimeLabel, 0, 1, Qt.AlignCenter)
-        self.timeRangeLayout.addWidget(self.endSelectedLine, 0, 2, Qt.AlignRight)
-        self.timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 3, Qt.AlignBottom)
+        self.timeRangeLayout.addWidget(self.startSelectedLine, 0, 0,
+                                       Qt.AlignmentFlag.AlignLeft)
+        self.timeRangeLayout.addWidget(self.selectedTimeLabel, 0, 1,
+                                       Qt.AlignmentFlag.AlignCenter)
+        self.timeRangeLayout.addWidget(self.endSelectedLine, 0, 2,
+                                       Qt.AlignmentFlag.AlignRight)
+        self.timeRangeLayout.addWidget(self.timeRangeSlider, 1, 0, 1, 3,
+                                       Qt.AlignmentFlag.AlignBottom)
 
         self.periodLayout = QHBoxLayout()
-        self.periodLayout.addWidget(self.periodLabel, alignment=Qt.AlignRight)
-        self.periodLayout.addWidget(self.periodLine, alignment=Qt.AlignRight)
+        self.periodLayout.addWidget(self.periodLabel,
+                                    alignment=Qt.AlignmentFlag.AlignRight)
+        self.periodLayout.addWidget(self.periodLine,
+                                    alignment=Qt.AlignmentFlag.AlignRight)
 
         self.timeLayout.addLayout(self.periodLayout, 0, 0, 1, 2,
-                                     (Qt.AlignRight | Qt.AlignBottom))
-        self.timeLayout.addLayout(self.timeRangeLayout, 1, 0, 1, 2, Qt.AlignBottom)
+                                  (Qt.AlignmentFlag.AlignRight |
+                                   Qt.AlignmentFlag.AlignBottom))
+        self.timeLayout.addLayout(self.timeRangeLayout, 1, 0, 1, 2,
+                                  Qt.AlignmentFlag.AlignBottom)
 
         self.timeGroup.setDisabled(True)
 

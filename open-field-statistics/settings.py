@@ -12,8 +12,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QKeySequence
 
-from superqt import QRangeSlider
-
 
 DEFAULT_FOLDER_TYPES = ['loadData', 'params', 'saveData', 'saveMap']
 FIELD_PARAMETERS = ['numLasersX', 'numLasersY', 'boxSideX', 'boxSideY']
@@ -95,7 +93,7 @@ class Settings():
 
             self.setWindowTitle('Settings')
 
-            dialogButtons = QDialogButtonBox.Save | QDialogButtonBox.Cancel
+            dialogButtons = QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
             self.buttonBox = QDialogButtonBox(dialogButtons)
             self.buttonBox.accepted.connect(self.accept)
             self.buttonBox.rejected.connect(self.reject)
@@ -306,7 +304,7 @@ class Settings():
             return outputFormatGroup
 
         def keyPressEvent(self, event):
-            if event.matches(QKeySequence.Cancel):
+            if event.matches(QKeySequence.StandardKey.Cancel):
                 self.reject()
             else:
                 event.ignore()

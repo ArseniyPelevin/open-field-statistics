@@ -16,8 +16,6 @@ from PyQt6.QtGui import (
 )
 from PyQt6 import sip
 
-import superqt
-
 from color_style import ColorStyle
 
 
@@ -133,8 +131,8 @@ class MapWidget(QLabel):
         self.pathLayer = QPixmap(self.mapSideX, self.mapSideY)
 
         self.gridLayer.fill()
-        self.zoneLayer.fill(Qt.transparent)
-        self.pathLayer.fill(Qt.transparent)
+        self.zoneLayer.fill(Qt.GlobalColor.transparent)
+        self.pathLayer.fill(Qt.GlobalColor.transparent)
 
         gridPainter = QPainter(self.gridLayer)
 
@@ -177,7 +175,7 @@ class MapWidget(QLabel):
         hasValues = np.where(self.bufferZoneCoord)
         zoneCoord[hasValues] = self.bufferZoneCoord[hasValues]
 
-        self.zoneLayer.fill(Qt.transparent)
+        self.zoneLayer.fill(Qt.GlobalColor.transparent)
 
         zonePainter = QPainter(self.zoneLayer)
 
@@ -203,11 +201,11 @@ class MapWidget(QLabel):
         start = pd.to_timedelta(start, unit='s')
         end = pd.to_timedelta(end, unit='s')
 
-        self.pathLayer.fill(Qt.transparent)
+        self.pathLayer.fill(Qt.GlobalColor.transparent)
 
         pathPainter = QPainter(self.pathLayer)
 
-        pathPainter.setPen(QPen(Qt.red, 2))
+        pathPainter.setPen(QPen(Qt.GlobalColor.red, 2))
         pathPainter.drawPolyline(self.makePath(self.window.stat.df[start:end]))
 
         pathPainter.end()
@@ -521,7 +519,7 @@ class MapWidget(QLabel):
 
             # Apply mask
             squareMapButtons[s].setMask(pixmap.scaled(
-                squareMapButtons[s].size(), Qt.IgnoreAspectRatio).mask())
+                squareMapButtons[s].size(), Qt.AspectRatioMode.IgnoreAspectRatio).mask())
 
             squareMapLayout.addWidget(squareMapButtons[s], 0, 0)
             squareMapButtons[s].toggled.connect(
@@ -629,7 +627,8 @@ class MapWidget(QLabel):
         self.areaTypeBtnLayout.insertSpacing(len(self.customAreas), size // 2)
 
         self.areaBtnLayout.addLayout(self.areaTypeBtnLayout, 0, 0)
-        self.areaBtnLayout.addWidget(self.clearMapButton, 0, 1, alignment=Qt.AlignBottom)
+        self.areaBtnLayout.addWidget(self.clearMapButton, 0, 1,
+                                     alignment=Qt.AlignmentFlag.AlignBottom)
 
     def mousePressEvent(self, event):
         # Starting position of drag-select rubber band

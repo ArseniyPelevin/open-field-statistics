@@ -10,8 +10,6 @@ from PyQt6.QtWidgets import (QFileDialog, QMessageBox,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontMetrics, QAction
 
-from superqt import QRangeSlider
-
 
 class File:
     def __init__(self, window):
@@ -169,7 +167,7 @@ class File:
         metrix = QFontMetrics(self.fileNameLabel.font())
         width = self.fileNameLabel.width() - 2;
         clippedDataFileName = metrix.elidedText(loadDataFile,
-                                                Qt.ElideMiddle, width)
+                                                Qt.TextElideMode.ElideMiddle, width)
         self.fileNameLabel.setText(clippedDataFileName)
 
     def deleteData(self):

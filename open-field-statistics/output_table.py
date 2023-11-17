@@ -4,8 +4,6 @@ from PyQt6.QtWidgets import QTableView, QHeaderView, QAbstractItemView
 from PyQt6.QtCore import Qt, QAbstractTableModel
 from PyQt6.QtGui import QColor
 
-from superqt import QRangeSlider
-
 from color_style import ColorStyle
 
 
@@ -23,7 +21,7 @@ class TableModel(QAbstractTableModel):
 
         numStatParam = len(self.window.settings.params['statParams'])
 
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             value = self._data.iloc[index.row(), index.column()]
             return str(value)
 
@@ -50,15 +48,15 @@ class TableModel(QAbstractTableModel):
     def headerData(self, section, orientation, role):
 
         # Section is the index of the column/row.
-        if role == Qt.DisplayRole:
-            if orientation == Qt.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
                 zone = self._data.columns[section]
                 # In table header display 'Zone n' instead of just 'n'
                 if zone != 'Whole_field':
                     zone = f'Zone {zone}'
                 return zone
 
-            if orientation == Qt.Vertical:
+            if orientation == Qt.Orientation.Vertical:
                 # Makeshift for multi header
                 return f'{self._data.index[section][0]}, {self._data.index[section][1]}'
 
@@ -90,15 +88,15 @@ class TableView(QTableView):
         print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         # Forbid user to touch anything in the table
-        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setSelectionMode(QAbstractItemView.NoSelection)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         # self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         # Set table headers
-        self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
 
         self.setStyleSheet(ColorStyle.tableStyleSheet)
 

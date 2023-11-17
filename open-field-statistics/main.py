@@ -1,4 +1,4 @@
-import os
+import sys
 import inspect
 
 from PyQt6.QtWidgets import (
@@ -8,8 +8,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QAction
-
-from superqt import QRangeSlider
 
 from settings import Settings
 from file_menu import File
@@ -71,15 +69,23 @@ class MainWindow(QMainWindow):
         print(__class__.__name__, inspect.currentframe().f_code.co_name)
 
         self.controlLayout = QGridLayout()
-        self.controlLayout.addWidget(self.file.loadFileButton, 0, 0, 1, 1, Qt.AlignLeft)
+        self.controlLayout.addWidget(self.file.loadFileButton, 0, 0, 1, 1,
+                                     Qt.AlignmentFlag.AlignLeft)
         self.controlLayout.addWidget(self.file.fileNameLabel, 0, 1, 1, 2)
 
         # Load map widgets to window's layout
-        self.controlLayout.addWidget(self.map.addZoneBtn, 1, 1, 1, 1, Qt.AlignRight)
-        self.controlLayout.addLayout(self.map.areaBtnLayout, 2, 0, 1, 1, Qt.AlignLeft)
-        self.controlLayout.addWidget(self.map, 2, 1, 1, 1, Qt.AlignLeft)
+        self.controlLayout.addWidget(self.map.addZoneBtn, 1, 1, 1, 1,
+                                      Qt.AlignmentFlag.AlignRight)
+        self.controlLayout.addLayout(self.map.areaBtnLayout, 2, 0, 1, 1,
+                                      Qt.AlignmentFlag.AlignLeft)
+        self.controlLayout.addWidget(self.map, 2, 1, 1, 1,
+                                      Qt.AlignmentFlag.AlignLeft)
+        self.controlLayout.addWidget(self.map.mapModeBox, 3, 1, 1, 1,
+                                     Qt.AlignmentFlag.AlignRight)
+        # self.controlLayout.addLayout(self.map.mapControlLayout, 1, 0, 1, 2)
 
-        self.controlLayout.addWidget(self.time.timeGroup, 4, 0, 1, 2, Qt.AlignBottom)
+        self.controlLayout.addWidget(self.time.timeGroup, 4, 0, 1, 2,
+                                     Qt.AlignmentFlag.AlignBottom)
 
         # Add spacers
         self.controlLayout.addItem(QSpacerItem(0, 0), 0, 2, 5, 1)
@@ -122,8 +128,8 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
-    app = QApplication(os.sys.argv)
+    app = QApplication(sys.argv)
     app.setStyle(QStyleFactory.create('Fusion'))
     window = MainWindow(app)
     window.show()
-    app.exec()
+    sys.exit(app.exec())
