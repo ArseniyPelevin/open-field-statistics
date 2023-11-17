@@ -134,8 +134,9 @@ class TimeParameters:
 
         with QSignalBlocker(self.timeRangeSlider):
             self.timeRangeSlider.setRange(0, self.totalTime / sliderStep)
-            self.timeRangeSlider.setValue([self.timeParams['startSelected'] / sliderStep,
-                                           self.timeParams['endSelected'] / sliderStep])
+            self.timeRangeSlider.setValue(
+                [self.timeParams['startSelected'] / sliderStep,
+                 self.timeParams['endSelected'] / sliderStep])
 
         self.timeGroup.setEnabled(True)
 
@@ -152,7 +153,7 @@ class TimeParameters:
 
         with QSignalBlocker(self.timeRangeSlider):
             self.timeRangeSlider.setValue([self.timeRangeSlider.minimum(),
-                                           self.timeRangeSlider.maximum()])
+                                            self.timeRangeSlider.maximum()])
 
         self.timeGroup.setDisabled(True)
 
@@ -192,7 +193,8 @@ class TimeParameters:
         end = self.endSelectedLine.value()
 
         errorMessage = ('End time should be in the range:\n'
-                        + f"{self.timeParams['startSelected']} s < end time ≤ {self.totalTime} s")
+                        + f"{self.timeParams['startSelected']} s < end time ≤ "
+                        + f"{self.totalTime} s")
 
         # Selected end < Selected start, back to previous value
         if end <= self.timeParams['startSelected']:

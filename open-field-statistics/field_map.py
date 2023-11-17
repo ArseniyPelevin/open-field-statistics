@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QPushButton,
+    QWidget, QLabel, QPushButton, QComboBox,
     QButtonGroup, QVBoxLayout, QHBoxLayout, QGridLayout, QStackedLayout,
     QRubberBand
 )
@@ -38,9 +38,48 @@ class MapWidget(QLabel):
         self.defineAreaTypes()
         self.createAreaButtons()
         self.loadMap()
+        self.setMapLayout()
 
         # Rubber band for drag-selection
         self.rubberBand = QRubberBand(QRubberBand.Shape.Rectangle, self)
+
+    def setMapLayout(self):
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
+
+        # self.mapControlLayout = QGridLayout()
+
+        self.addZoneBtn = QPushButton('Add zone')
+        self.addZoneBtn.setFixedWidth(80)
+        self.addZoneBtn.setDisabled(True)
+        self.addZoneBtn.clicked.connect(self.addNewZone)
+
+        self.mapMode = 'total'
+        self.mapModeBox = QComboBox()
+        self.mapModeBox.addItems(['Total movements', 'Ambulatory movements'])
+        self.mapModeBox.setCurrentText('Total movements')
+        self.mapModeBox.currentTextChanged.connect(self.changeMapMode)
+
+        # Load map widgets to mapControlLayout
+        # self.mapControlLayout.addWidget(self.addZoneBtn, 0, 1, 1, 1,
+        #                              Qt.AlignmentFlag.AlignRight)
+        # self.mapControlLayout.addLayout(self.areaBtnLayout, 1, 0, 1, 1,
+        #                              Qt.AlignmentFlag.AlignLeft)
+        # self.mapControlLayout.addWidget(self, 1, 1, 1, 1,
+        #                              Qt.AlignmentFlag.AlignLeft)
+        # self.mapControlLayout.addWidget(self.mapModeBox, 2, 1, 1, 1,
+        #                          Qt.AlignmentFlag.AlignRight)
+
+    def changeMapMode(self, text):
+        print(__class__.__name__, inspect.currentframe().f_code.co_name)
+
+        if text == 'Total movements':
+            self.mapMode = 'total'
+        elif text == 'Ambulatory movements':
+            self.mapMode = 'ambulatory'
+
+        self.updateMapPath(
+            self.window.time.timeParams['startSelected'],
+            self.window.time.timeParams['endSelected'])
 
     def loadMap(self):
         print(__class__.__name__, inspect.currentframe().f_code.co_name)
@@ -180,14 +219,20 @@ class MapWidget(QLabel):
 
         ''' Make array of path QPoints for visualization '''
 
+        if self.mapMode == 'total':
+            ax = {'x': 'x', 'y': 'y'}
+        elif self.mapMode == 'ambulatory':
+            ax = {'x': 'x_amb', 'y': 'y_amb'}
+
+
         size = df.shape[0]
         polyline = QPolygonF([QPointF(0, 0)] * size)
         buffer = polyline.data()
         buffer.setsize(2 * 8 * size)
         memory = np.frombuffer(buffer, np.float64)
         memory[:] = (pd
-                     .concat([df['x'] * self.cellX,
-                              df['y'] * self.cellY],
+                     .concat([df[ax['x']] * self.cellX,
+                              df[ax['y']] * self.cellY],
                              axis=1
                              )
                      .to_numpy().flatten()
@@ -349,13 +394,10 @@ class MapWidget(QLabel):
         self.customAreas = ['cell', 'column', 'row', 'square']
         self.predefinedAreas = ['vertical_halves', 'horizontal_halves',
                                 'wall', 'wall_corners']
-        self.customAreaMethods = [self.defineCellMapButtons, self.defineColumnMapButtons,
-                             self.defineRowMapButtons, self.defineSquareMapButtons]
-
-        self.addZoneBtn = QPushButton('Add zone')
-        self.addZoneBtn.setFixedWidth(80)
-        self.addZoneBtn.setDisabled(True)
-        self.addZoneBtn.clicked.connect(self.addNewZone)
+        self.customAreaMethods = [self.defineCellMapButtons,
+                                  self.defineColumnMapButtons,
+                                  self.defineRowMapButtons,
+                                  self.defineSquareMapButtons]
 
         # Make dict to index through QButtonGroup and QStackedLayout
         self.areaBtnIdx = {i: k for i, k

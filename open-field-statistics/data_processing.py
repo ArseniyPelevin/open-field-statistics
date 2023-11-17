@@ -26,7 +26,7 @@ class DataProcessing():
                 data=np.full(shape=(len(self.params['statParams']),
                                     len(self.zones) + 1),  # Whole_field + zones
                              fill_value=''),
-                index=pd.MultiIndex.from_product([['Total_time'],
+                index=pd.MultiIndex.from_product([['Whole_time'],
                                                   self.params['statParams']]),
                 columns=(['Whole_field'] + self.zones.tolist())
                 )
@@ -52,6 +52,17 @@ class DataProcessing():
 
         ''' Preprocess raw data independent of time and zone parameters '''
 
+        def filter_ambulatory(df, ax):
+            df[f'{ax}_diff'] = df[f'{ax}'].diff()
+            df = df.loc[df.loc[:, f'{ax}_diff'] != 0, [f'{ax}', f'{ax}_diff']]
+            df[f'{ax}_rolling'] = (df[f'{ax}_diff']
+                                   .rolling(window=2, min_periods=1).sum())
+            df[f'{ax}_amb'] = (df[f'{ax}']
+                               .loc[df[f'{ax}_rolling'] != 0]
+                               .ffill())
+
+            return df[[f'{ax}_amb']]
+
         # Exclude rows with any of four coordinates missing
 #TODO mention this behavior in documentation
         df = df.loc[(df.loc[:, 'x1':'y2'] != 0).all(axis=1)]
@@ -68,28 +79,33 @@ class DataProcessing():
               .ffill()
               )
 
-        # Central point of the animal
-        df['x'] = df[['x1', 'x2']].mean(axis=1)
-        df['y'] = df[['y1', 'y2']].mean(axis=1)
-
         # Change from original bottom-left coordinates to numpy and qt top-left
-        df['y'] = self.params['numLasersY'] - df['y'] + 1
+        df['y1'] = self.params['numLasersY'] - df['y1'] + 1
+        df['y2'] = self.params['numLasersY'] - df['y2'] + 1
 
-        # Lasers are indexed 1-16 and correspond to centers of cells
-        # Change to Euclidean coordinates
-        df['x'] = df['x'] - 0.5
-        df['y'] -= 0.5
+        for ax in ['x1', 'x2', 'y1', 'y2']:
+            df = df.join(filter_ambulatory(df[[ax]].copy(), ax), how='outer')
+            df[f'{ax}_amb'] = df[f'{ax}_amb'].ffill()
 
-        # Distance by each axis
-        df['dx'] = df['x'].diff()
-        df['dy'] = df['y'].diff()
+        for xy in ['x', 'y']:
+            for amb in ['', '_amb']:
+                # Central point of the animal
+                df[f'{xy}{amb}'] = df[[f'{xy}1{amb}', f'{xy}2{amb}']].mean(axis=1)
 
-        # Convert to real world distance in cm
-        df['dx'] *= self.params['boxSideX'] / self.params['numLasersX']
-        df['dy'] *= self.params['boxSideY'] / self.params['numLasersY']
+                # Lasers are indexed 1-16 and correspond to centers of cells
+                # Change to Euclidean coordinates
+                df[f'{xy}{amb}'] -= 0.5
+
+                # Distance by each axis
+                df[f'd{xy}{amb}'] = df[f'{xy}{amb}'].diff()
+
+                # Convert to real world distance in cm
+                df[f'd{xy}{amb}'] *= (self.params['boxSideX']
+                                      / self.params['numLasersX'])
 
         # Distance travelled since previous timestamp
-        df['dist'] = np.hypot(df['dx'], df['dy'])
+        df['dist_total'] = np.hypot(df['dx'], df['dy'])
+        df['dist_amb'] = np.hypot(df['dx_amb'], df['dy_amb'])
 
         # Start of rearing
         df['dz'] = df['z'].diff()
@@ -107,9 +123,13 @@ class DataProcessing():
               .pivot_table(
                   index=index,
                   columns='zone',
-                  values=['time', 'dist', 'rearing_n', 'rearing_time'],
-                  aggfunc={'time': 'count', 'dist': 'sum',
-                           'rearing_n': 'sum', 'rearing_time': 'sum'}
+                  values=['time', 'dist_total', 'dist_amb',
+                          'rearing_n', 'rearing_time'],
+                  aggfunc={'time': 'count',
+                           'dist_total': 'sum',
+                           'dist_amb': 'sum',
+                           'rearing_n': 'sum',
+                           'rearing_time': 'sum'}
               )
               )
 
@@ -138,9 +158,9 @@ class DataProcessing():
 #TODO mention this behavior in documentation
         # Make periods' index in the format 'period_start—period_end'
         # Periods are relative to the start of Selected_time interval,
-        # not the start of Total_time of recording.
+        # not the start of Whole_time of recording.
         # End of the last period corresponds to the end of Selected_time
-        total_time = self.df.index[-1].total_seconds()
+        whole_time = self.df.index[-1].total_seconds()
         selected_time = np.round(end - start, 1)
         periods = zip(np.arange(0, selected_time, period),
                       np.append(np.arange(period, selected_time, period),
@@ -153,9 +173,11 @@ class DataProcessing():
         end = pd.to_timedelta(end, unit='s')
         period = pd.to_timedelta(period, unit='s')
 
+#TODO mention this behavior in documentation
         # Define zone of each timestamp
-        self.df['zone'] = self.zoneCoord[self.df['y'].astype(int),
-                                         self.df['x'].astype(int)]
+        # Zone is determined according to the ambulatory position
+        self.df['zone'] = self.zoneCoord[self.df['y_amb'].astype(int),
+                                         self.df['x_amb'].astype(int)]
 
         grouper = pd.Grouper(level='time',
                              freq=period,
@@ -180,12 +202,12 @@ class DataProcessing():
 
         data = (pd
 
-                # Add 'Selected_time', 'Total_time'
+                # Add 'Selected_time', 'Whole_time'
                 .concat([data,
                          pd.Series(data[data.index != '_not_selected'].sum(),
                                    name='Selected_time').to_frame().T,
                          pd.Series(data.sum(),
-                                   name='Total_time').to_frame().T
+                                   name='Whole_time').to_frame().T
                          ])
                 .stack(level='stats', future_stack=True)
 
@@ -198,14 +220,16 @@ class DataProcessing():
                 .assign(time=lambda data_: data_.time * 0.1)
                 .assign(rearing_time=lambda data_: data_.rearing_time * 0.1)
 
+#TODO mention this behavior in documentation
                 # Calculate velocity
-                .assign(velocity=lambda data_: data_.dist / data_.time)
+                # Velocity is calculated from ambulatory distance
+                .assign(velocity=lambda data_: data_.dist_amb / data_.time)
                 .unstack().stack(level=0, future_stack=True)
 
                 # Reorder and rename index values for final output
                 .reindex(columns=['Whole_field'] + self.zones.tolist(),
                          index=pd.MultiIndex.from_product([
-                             ['Total_time', 'Selected_time'] + periods_index,
+                             ['Whole_time', 'Selected_time'] + periods_index,
                              self.params['statParams']])
                          )
 
@@ -217,9 +241,9 @@ class DataProcessing():
 
         # Do not show single period which is no less than selected_time
         if abs(selected_time - period.total_seconds()) < 0.5:
-            data = data.loc[['Total_time', 'Selected_time']]
-        # Do not show selected_time if it is no less than total_time
-        if abs(total_time - selected_time) < 0.5:
+            data = data.loc[['Whole_time', 'Selected_time']]
+        # Do not show selected_time if it is no less than whole_time
+        if abs(whole_time - selected_time) < 0.5:
             data = data.drop(index='Selected_time', level=0)
 
         self.data = data

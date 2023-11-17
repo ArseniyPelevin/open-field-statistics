@@ -131,7 +131,8 @@ class TableView(QTableView):
 
         return (data
                 .rename(index={'time': 'Time (s)',
-                               'dist': 'Distance (cm)',
+                               'dist_total': 'Distance-total (cm)',
+                               'dist_amb': 'Distance-ambulatory (cm)',
                                'velocity': 'Velocity (cm/s)',
                                'rearing_n': 'Rearings number',
                                'rearing_time': 'Rearings time (s)'},

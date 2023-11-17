@@ -16,7 +16,9 @@ from superqt import QRangeSlider
 
 
 DEFAULT_FOLDER_TYPES = ['loadData', 'params', 'saveData', 'saveMap']
-ALL_STAT_PARAMS = ['time', 'dist', 'velocity', 'rearing_n', 'rearing_time']
+FIELD_PARAMETERS = ['numLasersX', 'numLasersY', 'boxSideX', 'boxSideY']
+ALL_STAT_PARAMS = ['time', 'dist_total', 'dist_amb', 'velocity',
+                   'rearing_n', 'rearing_time']
 DEFAULT_SETTINGS = {
     # File parameters:
     'dirs': {folder: None for folder in DEFAULT_FOLDER_TYPES},
@@ -29,10 +31,6 @@ DEFAULT_SETTINGS = {
 
     # Statistics parameters
     'statParams': ALL_STAT_PARAMS,
-
-    # Sampling parameters
-    # 'samplingFrequency': 0.1,  #???
-    # 'startTime': 1,  # First beam break
 
     # Output parameters:
     'separator': ';',
@@ -67,8 +65,8 @@ class Settings():
 
         self.settingsDialog = self.SettingsDialog(self.window, self.params)
         newSettings = self.settingsDialog.show()
-        newSettings['statParams'].sort(key = lambda i: ALL_STAT_PARAMS.index(i))
         if newSettings:
+            newSettings['statParams'].sort(key = lambda i: ALL_STAT_PARAMS.index(i))
             self.params.update(newSettings)
             if self.settingsDialog.fieldParameterChanged:
                 self.window.file.deleteData()
@@ -106,7 +104,6 @@ class Settings():
             self.layout.addWidget(self.createFileGroup())
             self.layout.addWidget(self.createFieldParametersGroup())
             self.layout.addWidget(self.createStatisticsGroup())
-            # self.layout.addWidget(self.createSamplingGroup())  #???
             self.layout.addWidget(self.createOutputFormatGroup())
 
             self.layout.addWidget(self.buttonBox)
@@ -198,7 +195,6 @@ class Settings():
             numLasersX.setRange(1, 999) #TODO Test 1
             numLasersX.setValue(self.tempSettings['numLasersX'])
 
-
             numLasersYLabel = QLabel('Number of beams by vertical axis')
             numLasersY = QSpinBox()
             numLasersY.setRange(1, 999)
@@ -250,71 +246,33 @@ class Settings():
             statisticsGroup = QGroupBox('Output statistics')
             statisticsGroupLayout = QVBoxLayout(statisticsGroup)
 
-            time = QCheckBox('Time')
-            time.setChecked('time' in self.tempSettings['statParams'])
-            dist = QCheckBox('Distance')
-            dist.setChecked('dist' in self.tempSettings['statParams'])
-            velocity = QCheckBox('Velocity')
-            velocity.setChecked('velocity' in self.tempSettings['statParams'])
-            rearingN = QCheckBox('Rearings number')
-            rearingN.setChecked('rearing_n' in self.tempSettings['statParams'])
-            rearingTime = QCheckBox('Rearings time')
-            rearingTime.setChecked('rearing_time' in self.tempSettings['statParams'])
+            stats = ALL_STAT_PARAMS
+            items = ['caption', 'checkBox']
+            statItems = pd.DataFrame(index=stats, columns=items)
 
-            time.toggled.connect(lambda checked:
-                self.tempSettings['statParams'].append('time') if checked
-                else self.tempSettings['statParams'].remove('time'))
-            dist.toggled.connect(lambda checked:
-                self.tempSettings['statParams'].append('dist') if checked
-                else self.tempSettings['statParams'].remove('dist'))
-            velocity.toggled.connect(lambda checked:
-                self.tempSettings['statParams'].append('velocity') if checked
-                else self.tempSettings['statParams'].remove('velocity'))
-            rearingN.toggled.connect(lambda checked:
-                self.tempSettings['statParams'].append('rearing_n') if checked
-                else self.tempSettings['statParams'].remove('rearing_n'))
-            rearingTime.toggled.connect(lambda checked:
-                self.tempSettings['statParams'].append('rearing_time') if checked
-                else self.tempSettings['statParams'].remove('rearing_time'))
+            statItems.loc[:, 'caption'] = [
+                'Time',
+                'Distance-total',
+                'Distance-ambulatory',
+                'Velocity',
+                'Rearings number',
+                'Rearings time'
+                ]
 
-            statisticsGroupLayout.addWidget(time)
-            statisticsGroupLayout.addWidget(dist)
-            statisticsGroupLayout.addWidget(velocity)
-            statisticsGroupLayout.addWidget(rearingN)
-            statisticsGroupLayout.addWidget(rearingTime)
+            for stat in stats:
+                statItems.loc[stat, 'checkBox'] = QCheckBox(
+                    statItems.loc[stat, 'caption'])
+                statItems.loc[stat, 'checkBox'].setChecked(
+                    stat in self.tempSettings['statParams'])
+
+                statItems.loc[stat, 'checkBox'].toggled.connect(
+                    lambda checked, stat_=stat:
+                    self.tempSettings['statParams'].append(stat_) if checked
+                    else self.tempSettings['statParams'].remove(stat_))
+
+                statisticsGroupLayout.addWidget(statItems.loc[stat, 'checkBox'])
 
             return statisticsGroup
-
-        #FIXME Delete it all?
-        # def createSamplingGroup(self):
-        #     print(__class__.__name__, inspect.currentframe().f_code.co_name)
-
-        #     samplingGroup = QGroupBox('Sampling parameters')
-        #     samplingGroupLayout = QGridLayout(samplingGroup)
-
-        #     samplingFrequencyLabel = QLabel('Sampling frequency (s)')
-        #     samplingFrequency = QDoubleSpinBox()
-        #     samplingFrequency.setRange(0.1, 1)
-        #     samplingFrequency.setSingleStep(0.1)
-        #     samplingFrequency.setSuffix(' s')
-        #     samplingFrequency.setValue(self.tempSettings['samplingFrequency'])
-
-        #     startTimeLabel = QLabel('Start time from: ')
-        #     startTime = QComboBox()
-        #     startTime.addItems(['Start of recording', 'First beam break'])
-        #     startTime.setCurrentIndex(self.tempSettings['startTime'])
-
-        #     samplingFrequency.valueChanged.connect(lambda val:
-        #        self.tempSettings.update({'samplingFrequency': val}))
-        #     startTime.currentIndexChanged.connect(lambda val:
-        #        self.tempSettings.update({'startTime': val}))
-
-        #     samplingGroupLayout.addWidget(samplingFrequencyLabel, 0, 0)
-        #     samplingGroupLayout.addWidget(samplingFrequency, 0, 1)
-        #     samplingGroupLayout.addWidget(startTimeLabel, 1, 0)
-        #     samplingGroupLayout.addWidget(startTime, 1, 1)
-
-        #     return samplingGroup
 
         #??? Just trust some locale?
         def createOutputFormatGroup(self):
